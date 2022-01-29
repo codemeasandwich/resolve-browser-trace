@@ -1,0 +1,27 @@
+{
+  "name": "resolve-browser-trace",
+  "version": "0.7.0",
+  "description": "node library to use client side source map to resolve stacktraces",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codemeasandwich/resolve-browser-trace.git"
+  },
+  "keywords": [
+    "source-map",
+    "browser"
+  ],
+  "author": "Brian Shannon (http://www.codemeasandwich.com)",
+  "license": "apache 2",
+  "bugs": {
+    "url": "https://github.com/codemeasandwich/resolve-browser-trace/issues"
+  },
+  "homepage": "https://github.com/codemeasandwich/resolve-browser-trace#readme",
+  "dependencies": {
+    "source-map": "^0.7.3",
+    "stacktrace-parser":
+  }
+}
