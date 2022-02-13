@@ -1,6 +1,6 @@
 {
   "name": "resolve-browser-trace",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "node library to use client side source map to resolve stacktraces",
   "main": "index.js",
   "scripts": {
@@ -21,7 +21,7 @@
   },
   "homepage": "https://github.com/codemeasandwich/resolve-browser-trace#readme",
   "dependencies": {
-    "source-map": "^0.7.3",
-    "stacktrace-parser":
+    "source-map": "^ 10.7.3",
+    "stacktrace-parser":"0.1.10"
   }
 }

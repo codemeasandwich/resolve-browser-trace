@@ -8,13 +8,24 @@ function setup(whereClientMapFileLive) {
     
     return (sha,stackString) => {
         
+        const stackLines = stackString.split("\n")
+        
         const rawStack = stackTraceParser.parse(stackString)
         
         const work = lookup => {
-          return rawStack.map(rawLineInfo=>{
+          return rawStack.map((rawLineInfo,index)=>{
             
             // {file,methodName,arguments,lineNumber,column}
             
+           const [ fromLine, fromCol ] = stackLines[index].split(":").splice(-2).map(val => val.replace(/[^\d]/g, ""))
+          
+           // This is to fix a dug where stacktrace-parser is not parcing Chrome traces right
+           if ( ! stackLines[index].includes(`:${rawLineInfo.lineNumber}:${rawLineInfo.column}`)
+               && stackLines[index].includes(`:${fromLine}:${fromCol}`)){
+             rawLineInfo.lineNumber = +fromLine
+             rawLineInfo.column = +fromCol
+           }
+           
            const sourceInfo = lookup ? lookup.originalPositionFor({
             line:rawLineInfo.lineNumber,
             column:rawLineInfo.column
@@ -24,19 +35,36 @@ function setup(whereClientMapFileLive) {
             column:null,
             name:null
            }
+           
            // {source,line,column,name}
            Object.keys(rawLineInfo).forEach(key => {
             if ("<unknown>" === rawLineInfo[key]) {
                 rawLineInfo[key] = null
             }
            })
-           return {
+           
+           rawLineInfo.toString = ()=>stackLines[index]
+
+           
+           const result = {
                 from:rawLineInfo,
-                source:sourceInfo.source,
+                source:sourceInfo.source.replace("webpack:///",""),
                 line:sourceInfo.line,
                 column:sourceInfo.column,
                 name:sourceInfo.name
             }
+            
+           const cleanLine = stackLines[index].replace(rawLineInfo.file,result.source)
+                                   .replace(`:${rawLineInfo.lineNumber}:${rawLineInfo.column}`,
+                                            `:${result.line}:${result.column}`)
+                                   .replace(result.name ? `${rawLineInfo.methodName || ""}@` : "",
+                                            result.name ? `${result.name}@` : "")
+                                   .replace(result.name ? `at ${rawLineInfo.methodName || ""}` : "",
+                                            result.name ? `at ${result.name}` : "")
+            result.toString = ()=>cleanLine
+            
+            return result
+           
           })
         } // END work
         
@@ -45,7 +73,7 @@ function setup(whereClientMapFileLive) {
                 shaMapLookUp[sha].then(work).then(resolve)
             } else {
                 fs.readdir( whereClientMapFileLive, (err, files) => {
-                    const findMap = files.filter(file =>file.endsWith(".map"))
+                    const findMap = files.filter(file =>file.includes(".map"))
                                          .find(file =>file.includes(sha))
                     
                     if ( ! findMap) {

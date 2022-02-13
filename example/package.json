@@ -1,0 +1,12 @@
+{
+  "name": "resolve-browser-trace example",
+  "version": "1.0.0",
+  "description": "An example of how resolve-browser-trace works in the real world",
+  "scripts": {
+    "setup": "cd ./client && npm install && cd ../server && npm install",
+    "build":"cd ./client && npm build",
+    "start": "cd ./server && node index.js"
+  },
+  "author": "Brian Shannon",
+  "license": "apache 2"
+}

@@ -1,8 +1,19 @@
+
 # resolve-browser-trace
 
-![n-is-not-defined](/imgs/notdefined.jpg)
+### When it comes to the stability of your web application, knowing when your **production users have a problem is critical**!
 
-A Server/Node library to rebuild client side stacktraces into source files
+When we develop locally. We can have the convenience of a readable stacktrace to let you know what has happened.
+However, with your live site, letting the whole world know how our source is constructed is not something we may want.
+
+### The Problem:
+**How can we get a useful stack trace from client-side errors without exposing the inner workings?**
+
+
+### The Solution:
+**Send the client Error & stack to the Server. Then get the server to clean up the stack-trace before it gets saved your logs for review.**
+
+## resolve-browser-trace is a NodeJs library to rebuild client side stacktraces into source pointers
 
 [![npm version](https://badge.fury.io/js/resolve-browser-trace.svg)](https://www.npmjs.com/package/resolve-browser-trace) [![License](http://img.shields.io/:license-apache_2-yellow.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -38,24 +49,26 @@ sourceDecoder(sha,stack) // returns Promise
 ``` js
 const sourceDecoder = require('resolve-browser-trace')(__dirname+"/src/ .map files are here")
 
-const sha = "9adc196540168f060d54"
+const sha = "9adc196540168f060d54" // What is hash
 const clientStacktrack = `@https://localhost/main-9adc196540168f060d54.min.js:1:3385
 @https://localhost/main-9adc196540168f060d54.min.js:1:96`;
 
 sourceDecoder(sha,stack).then(newStack => console.log(newStack))
-/*[
+/* RESULT -> [
   {
     "from": {
       "file": "https://localhost/main-9adc196540168f060d54.min.js",
       "methodName": null,
       "arguments": [],
       "lineNumber": 1,
-      "column": 3385
+      "column": 3385,
+      "toString": ()=>"@https://localhost/main-9adc196540168f060d54.min.js:1:3385"
     },
     "source": "webpack:///main.jsx",
     "line": 20,
     "column": 21,
-    "name": appElem
+    "name": appElem,
+    "toString": ()=>"appElem@main.jsx:20:21"
   },
   {
     "from": {
@@ -63,12 +76,14 @@ sourceDecoder(sha,stack).then(newStack => console.log(newStack))
       "methodName": null,
       "arguments": [],
       "lineNumber": 1,
-      "column": 96
+      "column": 96,
+      "toString": ()=>"@https://localhost/main-9adc196540168f060d54.min.js:1:96"
     },
     "source": "webpack:///webpack/bootstrap 9adc196540168f060d54",
     "line": 19,
     "column": 0,
-    "name": "modules"
+    "name": "modules",
+    "toString": ()=>"modules@webpack/bootstrap 9adc196540168f060d54:20:21"
   }
 ]*/
 ```
@@ -84,8 +99,28 @@ module.exports = {
   target:"web",
   devtool: 'source-map',
   output: {
-    path: path.resolve(__dirname, "dist"),
+    path: path.resolve(__dirname, "public"),
     filename: "[name]-[hash].min.js"
   },
   // ...
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
