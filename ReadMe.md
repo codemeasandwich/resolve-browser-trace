@@ -88,8 +88,6 @@ sourceDecoder(sha,stack).then(newStack => console.log(newStack))
 ]*/
 ```
 
-![bundled-trace-in-source-pointer-out](/imgs/inout.jpg)
-
 # setup your webpack
 
 webpack.config.js

@@ -21,7 +21,7 @@
   },
   "homepage": "https://github.com/codemeasandwich/resolve-browser-trace#readme",
   "dependencies": {
-    "source-map": "^ 10.7.3",
+    "source-map": "0.7.3",
     "stacktrace-parser":"0.1.10"
   }
 }
