@@ -7,7 +7,7 @@ document.body.appendChild(reactElement);
 let errorVal;
 
 function foo(){
-    throw new Error("an error on the client")
+    throw new RangeError("an error on the client")
 }
 
 try{
@@ -19,7 +19,11 @@ try{
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({stack:err.stack})
+    body: JSON.stringify({
+      name:err.name,
+      message:err.message,
+      stack:err.stack,
+      __scribbles_gitStatus__})
   });
 }
 
@@ -33,4 +37,3 @@ render(<div>
                                       }</div>)
     }</p>
 </div>,reactElement)
-

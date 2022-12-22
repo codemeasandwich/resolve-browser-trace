@@ -2,6 +2,12 @@ const path = require("path");
 const setupResolveTrace = require("../../");//require('resolve-browser-trace')
 const express = require('express')
 const bodyParser = require("body-parser");
+const scribbles = require('scribbles')
+scribbles.config({
+   time: "HH:mm:ss.SSS",
+   format:' {time} <{logLevel}> {fileName}:{lineNumber} {message} {value} {stackTrace}'
+})
+global.console = scribbles
 const app = express()
 const port = 3000
 const pathToOutput = path.resolve(__dirname, "../output")
@@ -16,18 +22,18 @@ app.get('/', (req, res) => {
 })
 
 app.post('/api/error', (req, res) => {
-  
-  sourceDecoder("29a5d7571ba82f2e63c0",req.body.stack)
+console.log(req.body)
+  sourceDecoder(req.body.stack)
         .then(newStack => {
-          
+
           console.log(" ==================== Min client stacktrace")
           console.log(req.body.stack)
           console.log(" ==================== Clean client stacktrace")
           console.log(newStack.join("\n"))
           console.log(" ==================== ")
-          
+
         })
-        
+
   res.end();
 })
 

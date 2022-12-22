@@ -39,9 +39,9 @@ Next is to set the path to where you store your map files for your bundles
 const sourceDecoder = setupResolveTrace(__dirname+"/src/ .map files are here");
 ```
 
-To use just pass 1) sha or hash name for your bundle and 2) the string stacktrace
+To use just pass the stacktrace
 ``` js
-sourceDecoder(sha,stack) // returns Promise
+sourceDecoder(stack) // returns Promise
 ```
 
 # Example
@@ -49,11 +49,10 @@ sourceDecoder(sha,stack) // returns Promise
 ``` js
 const sourceDecoder = require('resolve-browser-trace')(__dirname+"/src/ .map files are here")
 
-const sha = "9adc196540168f060d54" // What is hash
 const clientStacktrack = `@https://localhost/main-9adc196540168f060d54.min.js:1:3385
 @https://localhost/main-9adc196540168f060d54.min.js:1:96`;
 
-sourceDecoder(sha,stack).then(newStack => console.log(newStack))
+sourceDecoder(clientStacktrack).then(newStack => console.log(newStack))
 /* RESULT -> [
   {
     "from": {
@@ -91,7 +90,7 @@ sourceDecoder(sha,stack).then(newStack => console.log(newStack))
 # setup your webpack
 
 webpack.config.js
-```js 
+```js
 module.exports = {
   // ...
   target:"web",
@@ -102,23 +101,3 @@ module.exports = {
   },
   // ...
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

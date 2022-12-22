@@ -1,5 +1,6 @@
 var path = require("path");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const ScribblesWithGitInBundle = require('scribbles/gitStatus');
 var webpack = require('webpack');
 
 module.exports = {
@@ -12,6 +13,7 @@ module.exports = {
     sourceMapFilename: 'private/[name]-[hash].map.js'
   },
   plugins: [
+      ScribblesWithGitInBundle,
       new HtmlWebpackPlugin({
         filename:"index.html",
         templateContent:'<!DOCTYPE html><html><head></head><body></body></html>'

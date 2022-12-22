@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "An example of how resolve-browser-trace works in the real world",
   "scripts": {
-    "setup": "cd ./client && npm install && cd ../server && npm install",
-    "build":"cd ./client && npm build",
+    "setup": "npm install && cd ./client && npm install && cd ../server && npm install",
+    "build": "cd ./client && npm build",
     "start": "cd ./server && node index.js"
   },
   "author": "Brian Shannon",
-  "license": "apache 2"
+  "license": "apache 2",
+  "dependencies": {
+    "scribbles": "^1.5.0",
+    "webpack": "^5.75.0"
+  }
 }
