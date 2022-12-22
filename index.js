@@ -16,7 +16,7 @@ function setup(whereClientMapFileLive) {
         const stackLines = stackString.split("\n")
 
         const rawStack = stackTraceParser.parse(stackString)
-
+        
         if( ! sha){
           // http://localhost:3000/public/ ->main-29a5d7571ba82f2e63c0<- .min.js:1:9562
           sha = rawStack[0].file.split("/").pop()
@@ -55,16 +55,16 @@ function setup(whereClientMapFileLive) {
             }
            })
 
-           rawLineInfo.toString = ()=>stackLines[index]
-
            const result = {
-                from:rawLineInfo,
+              //  from:rawLineInfo,
                 source:sourceInfo.source.replace("webpack:///",""),
                 line:sourceInfo.line,
+                arguments:rawLineInfo.arguments,
                 column:sourceInfo.column,
-                name:sourceInfo.name
+                name:sourceInfo.name || undefined
             }
-
+            /*
+                       rawLineInfo.toString = ()=>stackLines[index]
            const cleanLine = stackLines[index].replace(rawLineInfo.file,result.source)
                                    .replace(`:${rawLineInfo.lineNumber}:${rawLineInfo.column}`,
                                             `:${result.line}:${result.column}`)
@@ -73,7 +73,7 @@ function setup(whereClientMapFileLive) {
                                    .replace(result.name ? `at ${rawLineInfo.methodName || ""}` : "",
                                             result.name ? `at ${result.name}` : "")
             result.toString = ()=>cleanLine
-
+*/
             return result
 
           })

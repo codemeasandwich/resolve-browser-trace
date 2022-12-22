@@ -55,34 +55,18 @@ const clientStacktrack = `@https://localhost/main-9adc196540168f060d54.min.js:1:
 sourceDecoder(clientStacktrack).then(newStack => console.log(newStack))
 /* RESULT -> [
   {
-    "from": {
-      "file": "https://localhost/main-9adc196540168f060d54.min.js",
-      "methodName": null,
-      "arguments": [],
-      "lineNumber": 1,
-      "column": 3385,
-      "toString": ()=>"@https://localhost/main-9adc196540168f060d54.min.js:1:3385"
-    },
-    "source": "webpack:///main.jsx",
+    "source": "main.jsx",
     "line": 20,
     "column": 21,
-    "name": appElem,
-    "toString": ()=>"appElem@main.jsx:20:21"
+    "arguments": [],
+    "name": appElem
   },
   {
-    "from": {
-      "file": "file:///home/brian/www/redux-auto/example/dist/main-9adc196540168f060d54.min.js",
-      "methodName": null,
-      "arguments": [],
-      "lineNumber": 1,
-      "column": 96,
-      "toString": ()=>"@https://localhost/main-9adc196540168f060d54.min.js:1:96"
-    },
-    "source": "webpack:///webpack/bootstrap 9adc196540168f060d54",
+    "source": "webpack/bootstrap 9adc196540168f060d54",
     "line": 19,
     "column": 0,
+    "arguments": [],
     "name": "modules",
-    "toString": ()=>"modules@webpack/bootstrap 9adc196540168f060d54:20:21"
   }
 ]*/
 ```
