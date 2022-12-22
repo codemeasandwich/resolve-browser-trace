@@ -16,7 +16,9 @@ function setup(whereClientMapFileLive) {
         const stackLines = stackString.split("\n")
 
         const rawStack = stackTraceParser.parse(stackString)
-        
+        if (0 === rawStack.length) {
+            return Promise.resolve([])
+        }
         if( ! sha){
           // http://localhost:3000/public/ ->main-29a5d7571ba82f2e63c0<- .min.js:1:9562
           sha = rawStack[0].file.split("/").pop()
