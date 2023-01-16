@@ -47,7 +47,7 @@ function lookupRow(rawLineInfo, stackLine, lookup){
 
              const [ fromLine, fromCol ] = stackLine.split(":")
                                                     .splice(-2)
-                                                    .map(val => val : val.replace(/[^\d]/g, "") ? 0)
+                                                    .map(val => val ? val.replace(/[^\d]/g, "") : 0)
 
              // This is to fix a dug where stacktrace-parser is not parcing Chrome traces right
              if ( ! stackLine.includes(`:${rawLineInfo.lineNumber}:${rawLineInfo.column}`)
