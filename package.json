@@ -1,6 +1,6 @@
 {
   "name": "resolve-browser-trace",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "node library to use client side source map to resolve stacktraces",
   "main": "index.js",
   "scripts": {
