@@ -37,7 +37,7 @@ declare namespace createResolver {
     /** Add `sourceLine` (the original line of code, from the map's `sourcesContent`) to mapped frames. Default false. */
     includeSource?: boolean
     /** Called when a map exists but cannot be loaded or parsed. A missing map is not an error. */
-    onError?: (error: unknown, info: { file: string }) => void | Promise<void>
+    onError?: (error: unknown, info: { file: string }) => unknown
     /** Longest stack text read, in characters; the rest is ignored. Default 65536. */
     maxStackLength?: number
     /** Most frames returned for one stack. Default 100. */
