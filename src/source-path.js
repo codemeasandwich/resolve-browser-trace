@@ -11,17 +11,20 @@
 // A Windows drive ("C:\...", "c:foo") or a scheme other than webpack: marks an absolute path. Anything inside
 // node_modules is cut to node_modules/<package>/... Paths that were absolute or climbed out of the output folder
 // ("environment paths") are made relative to `root` when they sit under it. Otherwise they are cut down to src/...
-// (from the last "src" folder), or their last two segments. Nothing that comes back starts with "/", "..", or a
-// drive letter.
+// (from the last "src" folder), or their last two segments. Nothing that comes back starts with "/" or a
+// drive letter, and none of its segments is "..", "." or blank.
 
 const { sanitize } = require('./sanitize')
 
 // A source name longer than this is cut to its tail: nothing real is longer, and it bounds the work and the output.
 const MAX_SOURCE_LENGTH = 1000
 
-// "webpack:///x", "webpack://name/x", "vm:/x"; two or more letters, so "C:" stays a drive
-const SCHEME = /^([a-z][a-z0-9+.-]+):(\/\/[^/]*)?\/?/i
-const DRIVE_PREFIX = /^[a-z]:/i
+// "webpack:///x", "webpack://name/x", "vm:/x": two or more letters then a colon and a slash ("C:" is a drive, and
+// "app:main.ts" is just a name)
+const SCHEME = /^([a-z][a-z0-9+.-]+):(\/\/[^/]*\/?|\/)/i
+// "C:", "c:c:" (repeated, so stripping once can not leave one behind)
+const DRIVE_PREFIX = /^(?:[a-z]:)+/i
+const DRIVE_SEGMENT = /^[a-z]:$/i
 // Schemes whose paths are project-relative; for any other scheme (file:, vm:, ...) the path is the machine's.
 const PROJECT_SCHEMES = new Set(['webpack', 'webpack-internal', 'turbopack', 'ng'])
 
@@ -31,11 +34,16 @@ function splitPath(path) {
   let climbed = false
   let drive = false
   for (const part of path.split('/')) {
-    const segment = part.trim()
-    const withoutDrive = segment.replace(DRIVE_PREFIX, '')
-    if (withoutDrive !== segment) {
-      drive = true // "C:" or "C:foo" in the middle of a path ("./C:/Users/x.ts"); a drive is never part of a returned path
+    let segment = part.trim()
+    if (DRIVE_SEGMENT.test(segment)) {
+      drive = true // "C:" in the middle of a path ("./C:/Users/x.ts"); a drive is never part of a returned path
+      continue
     }
+    if (segments.length === 0 && DRIVE_PREFIX.test(segment)) {
+      drive = true // "/C:foo/x.ts": a drive-relative name first in the path
+      segment = segment.replace(DRIVE_PREFIX, '').trim()
+    }
+    const withoutDrive = segment
     if (withoutDrive === '..') {
       if (segments.length === 0) {
         climbed = true
@@ -69,7 +77,7 @@ function normalizeSource(raw, root) {
   const scheme = SCHEME.exec(path)
   if (scheme) {
     // a project scheme with a single slash ("webpack:/Users/..") is not the usual form: treat its path as the machine's
-    environment = !PROJECT_SCHEMES.has(scheme[1].toLowerCase()) || scheme[2] === undefined
+    environment = !PROJECT_SCHEMES.has(scheme[1].toLowerCase()) || scheme[2] === '/'
     path = path.slice(scheme[0].length)
   }
   const query = path.search(/[?#]/)
@@ -77,7 +85,7 @@ function normalizeSource(raw, root) {
   if (DRIVE_PREFIX.test(path) || path.startsWith('/')) {
     environment = true
   }
-  path = path.replace(DRIVE_PREFIX, '').replace(/^\/@fs\//, '/') // "/@fs/" is how Vite names files outside its root
+  path = path.replace(DRIVE_PREFIX, '').trim().replace(/^\/@fs\//, '/') // "/@fs/" is how Vite names files outside its root
   const { segments, climbed, drive } = splitPath(path)
   environment = environment || drive
   if (segments.length === 0) {

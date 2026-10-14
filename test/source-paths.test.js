@@ -96,6 +96,16 @@ describe('absolute paths of the build machine', () => {
   })
 })
 
+describe('names that merely look like schemes or drives are kept', () => {
+  test.each([
+    ['src/a:b.ts', 'src/a:b.ts'],
+    ['app:main.ts', 'app:main.ts'],
+    ['src/foo:bar/baz.ts', 'src/foo:bar/baz.ts'],
+  ])('%s stays %s', async (source, expected) => {
+    expect(await sourcesOf(replacing({ cart: source, app: source }))).toEqual([expected, expected, expected])
+  })
+})
+
 describe('whatever the map says, no result is an absolute or climbing path', () => {
   test.each([
     ['../../../../../etc/passwd'],
@@ -119,6 +129,10 @@ describe('whatever the map says, no result is an absolute or climbing path', () 
     ['/x/c:/y.ts'],
     ['/C:foo/x.ts'],
     ['..\\C:foo\\x.ts'],
+    ['c:c:c:x.ts'],
+    ['webpack:///c:c:c:x.ts'],
+    ['/@fs/c:c:x'],
+    ['vm: C: -x.ts'],
     ['vm:/Users/ci/build/shop/lib/a.ts'],
     ['webpack:/Users/ci/build/shop/lib/a.ts'],
     ['   '],

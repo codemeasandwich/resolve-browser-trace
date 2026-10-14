@@ -102,6 +102,17 @@ describe('the git hooks', () => {
     expect(execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: bare, encoding: 'utf8' })).toBe('')
   })
 
+  test('a hooks folder that cannot take the hook does not make npm install fail', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-dangling-'))
+    execFileSync('git', ['init', '-q'], { cwd: repo })
+    fs.symlinkSync('/nonexistent/hook', path.join(repo, '.git', 'hooks', 'commit-msg')) // a dangling link
+    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
+    fs.mkdirSync(path.join(repo, 'scripts'))
+    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
+    const out = execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo, encoding: 'utf8' })
+    expect(out).toMatch(/kept your existing commit-msg/)
+  })
+
   test('a hook the developer already has is kept', () => {
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-own-'))
     execFileSync('git', ['init', '-q'], { cwd: repo })

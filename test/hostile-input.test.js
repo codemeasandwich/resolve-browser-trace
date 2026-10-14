@@ -405,6 +405,14 @@ describe('maps that are small to store but expensive to open, and other leftover
     expect(frames[0].column === null || frames[0].column >= 1).toBe(true)
   })
 
+  test('a source line far down a file (over 20000 lines) is not looked for', async () => {
+    const content = `${'\n'.repeat(30000)}deep`
+    const vlq = (n) => { let v = n << 1; let out = ''; do { let d = v & 31; v >>>= 5; if (v) d |= 32; out += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'[d] } while (v); return out }
+    const deep = createResolver({ maps: { 'app.js': sourceMap({ sourcesContent: [content], mappings: `AA${vlq(30000)}A` }) }, includeSource: true })
+    const [first] = await deep(frame)
+    expect(first).toMatchObject({ mapped: true, line: 30001, sourceLine: null })
+  })
+
   test('a huge source file gets no source line, a tab becomes a space, and lone surrogates are removed', async () => {
     const make = (content) => createResolver({ maps: { 'app.js': sourceMap({ sourcesContent: [content] }) }, includeSource: true })(frame)
     expect((await make('x'.repeat(600000)))[0].sourceLine).toBeNull()

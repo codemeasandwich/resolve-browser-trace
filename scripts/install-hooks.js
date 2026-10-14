@@ -25,7 +25,7 @@ function installHooks(from, to, installed = [], kept = []) {
     const copied = path.join(to, entry.name)
     if (entry.isDirectory()) {
       installHooks(path.join(from, entry.name), copied, installed, kept)
-    } else if (fs.existsSync(copied)) {
+    } else if (fs.lstatSync(copied, { throwIfNoEntry: false })) {
       kept.push(entry.name)
     } else {
       fs.copyFileSync(path.join(from, entry.name), copied)
@@ -49,6 +49,11 @@ if (target && sharedHooksPath()) {
   // core.hooksPath often points at a folder shared by many repositories: never overwrite hooks there
   console.log('resolve-browser-trace: core.hooksPath is set, git hooks not installed (copy .hooks/* yourself if wanted)')
 } else if (target && fs.existsSync(source)) {
-  const { installed, kept } = installHooks(source, target)
-  console.log(`resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ') || 'none'}${kept.length ? `; kept your existing ${kept.join(', ')}` : ''}`)
+  try {
+    const { installed, kept } = installHooks(source, target)
+    console.log(`resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ') || 'none'}${kept.length ? `; kept your existing ${kept.join(', ')}` : ''}`)
+  } catch (error) {
+    // a hooks folder that cannot be written must not make `npm install` fail
+    console.log(`resolve-browser-trace: git hooks not installed (${error.message})`)
+  }
 }

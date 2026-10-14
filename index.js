@@ -84,9 +84,10 @@ function cleanName(raw) {
 
 // Finding line N walks the text, for every frame of every request, so a huge file gets no source line.
 const MAX_SOURCE_TEXT = 500_000
+const MAX_SOURCE_LINES = 20_000
 
 function lineOf(content, line) {
-  if (content.length > MAX_SOURCE_TEXT) {
+  if (content.length > MAX_SOURCE_TEXT || line > MAX_SOURCE_LINES) {
     return null
   }
   let start = 0
