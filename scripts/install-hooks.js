@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 // `npm install` runs this (via "prepare"): copies .hooks/* into the repository's git hooks folder.
-// Works in plain clones and in git worktrees (it asks git where hooks live). Does nothing, quietly, when there is
-// no git repository (for example when the package is installed from a tarball) or no .hooks folder.
+// Works in plain clones and in git worktrees (it asks git where hooks live).
+// It does nothing at all, and says nothing, when
+//   - CI is set (a build machine has no use for commit hooks),
+//   - this folder is not the top of its own git checkout (a tarball or a git dependency unpacked inside somebody
+//     else's repository must never touch that repository's hooks), or
+//   - there is no .hooks folder.
+// Its messages go to stderr: `npm pack --json` runs `prepare` on some npm versions and reads stdout as JSON.
 
 const { execFileSync } = require('node:child_process')
 const fs = require('node:fs')
@@ -10,9 +15,17 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..')
 const source = path.join(root, '.hooks')
 
+function git(...args) {
+  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+}
+
+// The hooks folder of the checkout this script lives in, or null when it is not the top of a git checkout.
 function hooksTarget() {
   try {
-    return path.resolve(root, execFileSync('git', ['rev-parse', '--git-path', 'hooks'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim())
+    if (fs.realpathSync(git('rev-parse', '--show-toplevel')) !== fs.realpathSync(root)) {
+      return null
+    }
+    return path.resolve(root, git('rev-parse', '--git-path', 'hooks'))
   } catch {
     return null
   }
@@ -52,23 +65,23 @@ function installHooks(from, to) {
 
 function sharedHooksPath() {
   try {
-    return execFileSync('git', ['config', '--get', 'core.hooksPath'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() !== ''
+    return git('config', '--get', 'core.hooksPath') !== ''
   } catch {
     return false
   }
 }
 
-const target = hooksTarget()
+const target = process.env.CI ? null : hooksTarget()
 if (target && sharedHooksPath()) {
   // core.hooksPath often points at a folder shared by many repositories: never overwrite hooks there
-  console.log('resolve-browser-trace: core.hooksPath is set, git hooks not installed (copy .hooks/* yourself if wanted)')
+  console.error('resolve-browser-trace: core.hooksPath is set, git hooks not installed (copy .hooks/* yourself if wanted)')
 } else if (target && fs.existsSync(source)) {
   try {
     const { installed, kept, upToDate } = installHooks(source, target)
     if (upToDate) {
-      console.log('resolve-browser-trace: git hooks up to date')
+      console.error('resolve-browser-trace: git hooks up to date')
     } else {
-      console.log(
+      console.error(
         kept.length > 0
           ? `resolve-browser-trace: git hooks not installed: you already have ${kept.join(', ')} in ${target}`
           : `resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ')}`
@@ -76,6 +89,6 @@ if (target && sharedHooksPath()) {
     }
   } catch (error) {
     // a hooks folder that cannot be written must not make `npm install` fail
-    console.log(`resolve-browser-trace: git hooks not installed (${error.message})`)
+    console.error(`resolve-browser-trace: git hooks not installed (${error.message})`)
   }
 }

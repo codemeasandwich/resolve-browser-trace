@@ -50,8 +50,19 @@ describe('using the package by name', () => {
   }, 60000)
 })
 
+// `npm pack --json` prints JSON on stdout. Some npm versions (10, as on CI) run the "prepare" script even with
+// --ignore-scripts, and a script that prints would corrupt that JSON, so take the JSON from its own first line.
+function packJson(folder, env = {}) {
+  const out = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+    cwd: folder,
+    encoding: 'utf8',
+    env: { ...process.env, npm_config_ignore_scripts: 'true', ...env },
+  })
+  return JSON.parse(out.slice(out.search(/^\[/m)))[0]
+}
+
 describe('what is published', () => {
-  const pack = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: PROJECT_ROOT, encoding: 'utf8' }))[0]
+  const pack = packJson(PROJECT_ROOT)
   const published = pack.files.map((f) => f.path)
 
   test('the tarball holds the library, its types, the licence and the docs', () => {
@@ -85,32 +96,56 @@ describe('the git hooks', () => {
     return fs.readdirSync(path.join(repo, '.git', 'hooks'))
   }
 
-  test('npm install in a clone installs the commit-msg and pre-commit hooks; in a folder without git it does nothing', () => {
+  function repoWithScript() {
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-hooks-'))
     execFileSync('git', ['init', '-q'], { cwd: repo })
-    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
-    fs.mkdirSync(path.join(repo, 'scripts'))
-    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
-    const out = execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo, encoding: 'utf8' })
-    expect(out).toMatch(/git hooks installed/)
+    copyScript(repo)
+    return repo
+  }
+  function copyScript(folder) {
+    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(folder, '.hooks'), { recursive: true })
+    fs.mkdirSync(path.join(folder, 'scripts'), { recursive: true })
+    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(folder, 'scripts', 'install-hooks.js'))
+  }
+  // what `npm install` runs, on a developer's machine (CI is not set) unless the test says otherwise.
+  // npm reads stdout of `npm pack --json`, so the script must never write to it.
+  function install(folder, env = {}) {
+    const clean = { ...process.env }
+    delete clean.CI
+    const result = spawnSync(process.execPath, ['scripts/install-hooks.js'], { cwd: folder, encoding: 'utf8', env: { ...clean, ...env } })
+    expect(result.stdout).toBe('')
+    return result
+  }
+
+  test('npm install in a clone installs the commit-msg and pre-commit hooks; in a folder without git it does nothing', () => {
+    const repo = repoWithScript()
+    expect(install(repo).stderr).toMatch(/git hooks installed/)
     expect(hooksOf(repo)).toEqual(expect.arrayContaining(['commit-msg', 'pre-commit', 'pre-commit.d']))
     expect(fs.statSync(path.join(repo, '.git', 'hooks', 'pre-commit')).mode & 0o111).not.toBe(0)
 
     const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-nogit-'))
-    fs.mkdirSync(path.join(bare, 'scripts'))
-    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(bare, 'scripts', 'install-hooks.js'))
-    expect(execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: bare, encoding: 'utf8' })).toBe('')
+    copyScript(bare)
+    expect(install(bare).stderr).toBe('')
   })
 
-  function repoWithScript() {
-    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-hooks-'))
-    execFileSync('git', ['init', '-q'], { cwd: repo })
-    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
-    fs.mkdirSync(path.join(repo, 'scripts'))
-    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
-    return repo
-  }
-  const install = (repo) => spawnSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo, encoding: 'utf8' })
+  test('on a CI machine (CI is set) it does nothing at all', () => {
+    const repo = repoWithScript()
+    const result = install(repo, { CI: 'true' })
+    expect(result.status).toBe(0)
+    expect(result.stderr).toBe('')
+    expect(hooksOf(repo).filter((f) => !f.endsWith('.sample'))).toEqual([])
+  })
+
+  test('unpacked inside somebody else\'s repository (a git dependency in node_modules), it leaves that repository\'s hooks alone', () => {
+    const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-outer-'))
+    execFileSync('git', ['init', '-q'], { cwd: outer })
+    const inner = path.join(outer, 'node_modules', 'resolve-browser-trace')
+    copyScript(inner)
+    const result = install(inner)
+    expect(result.status).toBe(0)
+    expect(result.stderr).toBe('')
+    expect(fs.readdirSync(path.join(outer, '.git', 'hooks')).filter((f) => !f.endsWith('.sample'))).toEqual([])
+  })
 
   test('a hooks folder that cannot be written does not make npm install fail (exit 0, says so)', () => {
     if (process.getuid && process.getuid() === 0) {
@@ -122,7 +157,7 @@ describe('the git hooks', () => {
     try {
       const result = install(repo)
       expect(result.status).toBe(0)
-      expect(result.stdout).toMatch(/git hooks not installed \(/)
+      expect(result.stderr).toMatch(/git hooks not installed \(/)
       expect(fs.readdirSync(hooks).filter((f) => !f.endsWith('.sample'))).toEqual([])
     } finally {
       fs.chmodSync(hooks, 0o755)
@@ -134,19 +169,19 @@ describe('the git hooks', () => {
     fs.symlinkSync('/nonexistent/hook', path.join(repo, '.git', 'hooks', 'commit-msg'))
     const result = install(repo)
     expect(result.status).toBe(0)
-    expect(result.stdout).toMatch(/not installed: you already have commit-msg/)
+    expect(result.stderr).toMatch(/not installed: you already have commit-msg/)
     expect(fs.existsSync(path.join(repo, '.git', 'hooks', 'pre-commit'))).toBe(false)
     expect(fs.readlinkSync(path.join(repo, '.git', 'hooks', 'commit-msg'))).toBe('/nonexistent/hook')
   })
 
   test('running it again when its own hooks are already there says they are up to date and changes nothing', () => {
     const repo = repoWithScript()
-    expect(install(repo).stdout).toMatch(/git hooks installed/)
+    expect(install(repo).stderr).toMatch(/git hooks installed/)
     const hook = path.join(repo, '.git', 'hooks', 'pre-commit')
     const before = fs.statSync(hook).mtimeMs
     const again = install(repo)
     expect(again.status).toBe(0)
-    expect(again.stdout).toBe('resolve-browser-trace: git hooks up to date\n')
+    expect(again.stderr).toBe('resolve-browser-trace: git hooks up to date\n')
     expect(fs.statSync(hook).mtimeMs).toBe(before)
   })
 
@@ -154,7 +189,7 @@ describe('the git hooks', () => {
     const repo = repoWithScript()
     install(repo)
     fs.rmSync(path.join(repo, '.git', 'hooks', 'pre-commit.d'), { recursive: true })
-    expect(install(repo).stdout).toMatch(/git hooks installed/)
+    expect(install(repo).stderr).toMatch(/git hooks installed/)
     expect(fs.existsSync(path.join(repo, '.git', 'hooks', 'pre-commit.d', 'check-coverage.sh'))).toBe(true)
   })
 
@@ -172,10 +207,8 @@ describe('the git hooks', () => {
     fs.writeFileSync(path.join(shared, 'pre-commit'), '#!/bin/sh\necho theirs\n')
     execFileSync('git', ['init', '-q'], { cwd: repo })
     execFileSync('git', ['config', 'core.hooksPath', shared], { cwd: repo })
-    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
-    fs.mkdirSync(path.join(repo, 'scripts'))
-    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
-    expect(execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo, encoding: 'utf8' })).toMatch(/core\.hooksPath is set/)
+    copyScript(repo)
+    expect(install(repo).stderr).toMatch(/core\.hooksPath is set/)
     expect(fs.readdirSync(shared)).toEqual(['pre-commit'])
     expect(fs.readFileSync(path.join(shared, 'pre-commit'), 'utf8')).toContain('theirs')
   })
@@ -194,5 +227,44 @@ describe('the git hooks', () => {
     expect(check('feat(): empty scope')).toBe(1)
     expect(check('added a thing')).toBe(1)
     expect(check(`feat: ${'x'.repeat(80)}`)).toBe(1)
+  })
+})
+
+describe('npm pack on a fresh checkout, the way CI runs it', () => {
+  // A copy of the working tree as git would hand it over: tracked and not-ignored files, a new repository, no hooks
+  // installed, no node_modules. Older npm runs "prepare" for `npm pack` even with --ignore-scripts; forcing the
+  // script to run (npm_config_ignore_scripts=false) reproduces that on any npm.
+  function freshCheckout() {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-fresh-'))
+    const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { cwd: PROJECT_ROOT, encoding: 'utf8' }).split('\n').filter(Boolean)
+    for (const file of files) {
+      if (fs.existsSync(path.join(PROJECT_ROOT, file))) {
+        fs.mkdirSync(path.dirname(path.join(folder, file)), { recursive: true })
+        fs.copyFileSync(path.join(PROJECT_ROOT, file), path.join(folder, file))
+      }
+    }
+    execFileSync('git', ['init', '-q'], { cwd: folder })
+    return folder
+  }
+  const withoutCi = () => {
+    const env = { ...process.env }
+    delete env.CI
+    return env
+  }
+  const hooksInstalled = (folder) => fs.readdirSync(path.join(folder, '.git', 'hooks')).filter((f) => !f.endsWith('.sample'))
+
+  test('with CI set and prepare forced to run, stdout is pure JSON listing the package, and no hooks are installed', () => {
+    const folder = freshCheckout()
+    const out = execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: folder, encoding: 'utf8', env: { ...process.env, CI: 'true', npm_config_ignore_scripts: 'false' } })
+    const [pack] = JSON.parse(out)
+    expect(pack.files.map((f) => f.path)).toContain('index.js')
+    expect(hooksInstalled(folder)).toEqual([])
+  })
+
+  test('on a developer machine too, stdout stays pure JSON (the hooks message goes to stderr)', () => {
+    const folder = freshCheckout()
+    const out = execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: folder, encoding: 'utf8', env: { ...withoutCi(), npm_config_ignore_scripts: 'false' }, stdio: ['ignore', 'pipe', 'ignore'] })
+    expect(JSON.parse(out)[0].name).toBe('resolve-browser-trace')
+    expect(hooksInstalled(folder)).toEqual(expect.arrayContaining(['commit-msg', 'pre-commit']))
   })
 })
