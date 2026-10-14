@@ -7,7 +7,7 @@ const { parseStack } = require('./src/parse-stack')
 const { sanitize } = require('./src/sanitize')
 const { normalizeSource, rootSegments } = require('./src/source-path')
 
-const DEFAULTS = { maxStackLength: 65536, maxFrames: 100, maxCachedMaps: 16, maxMapsPerStack: 4, maxMapBytes: 64 * 1024 * 1024 }
+const DEFAULTS = { maxStackLength: 65536, maxFrames: 100, maxCachedMaps: 16, maxMapsPerStack: 4, maxMapBytes: 32 * 1024 * 1024 }
 const MAX_SOURCE_LINE = 300
 
 function positiveInteger(options, key) {
@@ -78,11 +78,17 @@ function cleanName(raw) {
   while (end > 0 && name[end - 1] === '<') {
     end--
   }
-  name = name.slice(0, end)
+  name = sanitize(name.slice(0, end)).trim() // cutting at MAX_NAME_LENGTH can leave half an emoji
   return name === '' || name === '<anonymous>' || name === '<unknown>' ? null : name
 }
 
+// Finding line N walks the text, for every frame of every request, so a huge file gets no source line.
+const MAX_SOURCE_TEXT = 500_000
+
 function lineOf(content, line) {
+  if (content.length > MAX_SOURCE_TEXT) {
+    return null
+  }
   let start = 0
   for (let n = 1; n < line; n++) {
     const newline = content.indexOf('\n', start)
@@ -92,12 +98,12 @@ function lineOf(content, line) {
     start = newline + 1
   }
   const end = content.indexOf('\n', start)
-  return sanitize(content.slice(start, Math.min(end === -1 ? content.length : end, start + MAX_SOURCE_LINE))).trim()
+  return sanitize(content.slice(start, Math.min(end === -1 ? content.length : end, start + MAX_SOURCE_LINE)).replace(/\t/g, ' ')).trim()
 }
 
 function unmappedFrame(raw) {
   return {
-    source: raw.file.replace(/[?#].*$/, '') || null,
+    source: raw.file.replace(/[?#].*$/, '').trim() || null,
     line: raw.line,
     column: raw.column,
     name: cleanName(raw.name),
@@ -116,7 +122,7 @@ function createResolver(options) {
   const config = normalizeOptions(options)
   const store = createMapStore(config)
 
-  function mapKnownFrame(raw, map) {
+  function mapFrame(raw, map) {
     if (!map || raw.line === null || raw.line < 1 || raw.column === null || raw.column < 1) {
       return { frame: unmappedFrame(raw), callee: null }
     }
@@ -124,7 +130,8 @@ function createResolver(options) {
     const position = originalPositionFor(map, { line: raw.line, column: raw.column - 1 })
     // a hostile map can point a mapping at a `sources` entry that does not exist, or hold numbers that are not numbers
     const source = typeof position.source === 'string' ? normalizeSource(position.source, config.root) : null
-    if (source === null || !Number.isSafeInteger(position.line) || !Number.isSafeInteger(position.column)) {
+    // lines count from 1, columns from 0, and a hostile map can hold anything
+    if (source === null || !Number.isSafeInteger(position.line) || position.line < 1 || !Number.isSafeInteger(position.column + 1) || position.column < 0) {
       return { frame: unmappedFrame(raw), callee: null }
     }
     const frame = {
@@ -140,17 +147,8 @@ function createResolver(options) {
       // sourcesContent may be shorter than sources, or hold anything
       frame.sourceLine = typeof content === 'string' ? lineOf(content, position.line) : null
     }
-    const callee = typeof position.name === 'string' ? sanitize(position.name.slice(0, MAX_NAME_LENGTH)) : null
+    const callee = typeof position.name === 'string' ? sanitize(position.name.slice(0, MAX_NAME_LENGTH)).trim() : null
     return { frame, callee }
-  }
-
-  // Maps are data from outside this process; whatever is wrong inside one costs its frames their mapping, not the request.
-  function mapFrame(raw, map) {
-    try {
-      return mapKnownFrame(raw, map)
-    } catch {
-      return { frame: unmappedFrame(raw), callee: null }
-    }
   }
 
   /**

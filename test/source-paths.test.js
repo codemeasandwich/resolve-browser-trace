@@ -117,6 +117,13 @@ describe('whatever the map says, no result is an absolute or climbing path', () 
     ['./C:/Users/x.ts'],
     ['file:/Users/ci/secret/x.ts'],
     ['/x/c:/y.ts'],
+    ['/C:foo/x.ts'],
+    ['..\\C:foo\\x.ts'],
+    ['vm:/Users/ci/build/shop/lib/a.ts'],
+    ['webpack:/Users/ci/build/shop/lib/a.ts'],
+    ['   '],
+    ['.. /etc/x'],
+    ['...'],
     ['/x/y/C:'],
   ])('source %j', async (hostile) => {
     const out = await sourcesOf(Array(5).fill(hostile))

@@ -3,8 +3,9 @@
 // Text from a browser, and text from a source map, ends up in log lines. Control characters (C0/C1, \r, \n, ANSI
 // escapes), line and paragraph separators, and every "format" character (bidi marks and isolates, zero-width
 // marks, soft hyphen, tag characters, byte order mark) never belong in a frame: they could fake another frame,
-// reorder or hide text, or rewrite a terminal.
-const UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu
+// reorder or hide text, or rewrite a terminal. Lone surrogates (what cutting a string in the middle of an emoji
+// leaves) are removed too: they break encodeURIComponent and UTF-8 encoders.
+const UNSAFE = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu
 
 /**
  * @param {string} text

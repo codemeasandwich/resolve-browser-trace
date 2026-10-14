@@ -44,7 +44,7 @@ declare namespace createResolver {
     maxFrames?: number
     /** Parsed maps kept in memory (least recently used leave first). Default 16. */
     maxCachedMaps?: number
-    /** Largest map accepted, in characters of JSON (64 MiB). Bigger maps, or maps with over two million generated lines, are reported to `onError` and not used. */
+    /** Largest map accepted, in characters of JSON (32 MiB). Bigger maps, maps with over four million segments or lines, and maps whose `mappings` are not text are reported to `onError` and not used. */
     maxMapBytes?: number
     /** Most maps opened for one stack; frames of further bundles stay unmapped. Default 4. */
     maxMapsPerStack?: number

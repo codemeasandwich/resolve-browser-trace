@@ -28,11 +28,40 @@ function bundleFileName(file) {
   return SAFE_FILE_NAME.test(name) ? name : null
 }
 
-// Decoding allocates an array per generated line, so a map of nothing but ";" is a memory bomb at any byte size.
-const MAX_GENERATED_LINES = 2_000_000
+// Decoding allocates an array per generated line and per segment (about 40 bytes of heap per input byte for
+// "A,A,A,"), so the byte limit alone does not bound memory: a map is also limited by its number of segments,
+// and by the size of the lists and names it declares. Real maps are far inside all of these.
+const MAX_SEGMENTS = 4_000_000
+const MAX_SOURCES = 200_000
+const MAX_SOURCE_NAME_LENGTH = 4096
+
+function countSegments(mappings) {
+  let count = 0
+  for (let i = 0; i < mappings.length; i++) {
+    const code = mappings.charCodeAt(i)
+    if ((code === 44 || code === 59) && ++count > MAX_SEGMENTS) {
+      break
+    }
+  }
+  return count
+}
+
+function checkMapSize(map, maxMapBytes) {
+  if (typeof map.mappings !== 'string' || map.mappings.length > maxMapBytes || countSegments(map.mappings) > MAX_SEGMENTS) {
+    throw new RangeError('source map `mappings` must be text of at most maxMapBytes characters and four million segments')
+  }
+  const { sources, sourceRoot } = map
+  const tooLong = (name) => typeof name === 'string' && name.length > MAX_SOURCE_NAME_LENGTH
+  if ((Array.isArray(sources) && (sources.length > MAX_SOURCES || sources.some(tooLong))) || tooLong(sourceRoot)) {
+    throw new RangeError('source map has too many sources or a source name that is too long')
+  }
+}
 
 function toTraceMap(raw, maxMapBytes) {
   if (raw instanceof Uint8Array) {
+    if (raw.byteLength > maxMapBytes * 4) {
+      throw new RangeError(`source map is larger than maxMapBytes (${maxMapBytes})`)
+    }
     raw = Buffer.from(raw).toString('utf8')
   }
   if (typeof raw === 'string' && raw.length > maxMapBytes) {
@@ -44,16 +73,22 @@ function toTraceMap(raw, maxMapBytes) {
   if (typeof raw !== 'object' || raw === null) {
     throw new TypeError('a source map must be a JSON string, a Buffer or an object')
   }
-  if (typeof raw.mappings === 'string' && (raw.mappings.length > maxMapBytes || raw.mappings.split(';', MAX_GENERATED_LINES + 1).length > MAX_GENERATED_LINES)) {
-    throw new RangeError('source map has too many bytes or lines')
-  }
+  checkMapSize(raw, maxMapBytes)
   const map = new TraceMap(raw)
   decodedMappings(map) // decode now, while loading, so no lookup pays for it and a map that cannot be decoded fails here
   return map
 }
 
-function readMapFile(file) {
-  return fs.promises.readFile(file, 'utf8').catch((error) => {
+async function readFileWithin(file, maxBytes) {
+  const { size } = await fs.promises.stat(file)
+  if (size > maxBytes) {
+    throw new RangeError(`source map file is larger than maxMapBytes (${maxBytes / 4})`)
+  }
+  return fs.promises.readFile(file, 'utf8')
+}
+
+function readMapFile(file, maxMapBytes) {
+  return readFileWithin(file, maxMapBytes * 4).catch((error) => {
     if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
       return null
     }
@@ -79,7 +114,7 @@ function createMapStore(options) {
         return loaded
       }
     }
-    return mapsDir ? readMapFile(path.join(mapsDir, `${name}.map`)) : null
+    return mapsDir ? readMapFile(path.join(mapsDir, `${name}.map`), maxMapBytes) : null
   }
 
   async function load(name) {

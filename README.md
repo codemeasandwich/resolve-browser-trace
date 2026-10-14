@@ -68,7 +68,7 @@ call 0.x versions used (`setup` is kept as another name for `createResolver`).
 | `maxStackLength` | `65536` | Characters of stack text read; the rest is ignored. |
 | `maxFrames` | `100` | Frames returned for one stack. |
 | `maxCachedMaps` | `16` | Parsed maps kept in memory, least recently used out first. |
-| `maxMapBytes` | `67108864` | Largest map accepted, in characters of JSON. Bigger maps, and maps with over two million generated lines, are reported to `onError` and not used. |
+| `maxMapBytes` | `33554432` | Largest map accepted, in characters of JSON. Bigger maps, maps with over four million segments or lines, and maps whose `mappings` are not text are reported to `onError` and not used. |
 | `maxMapsPerStack` | `4` | Most maps opened for one stack; frames of further bundles stay unmapped. Parsing a map is synchronous work, so this bounds what one request can cost. |
 
 At least one of `mapsDir`, `maps` and `loadMap` is required (otherwise `createResolver` throws a `TypeError`).
@@ -133,7 +133,7 @@ Maps record file names in many styles. They come back as short project paths:
 | anything in `node_modules` | `node_modules/<package>/...` |
 | an absolute path outside `root` (or no `root`) | `src/...` from its last `src` folder, else its last two segments (which can include one folder name, so set `root`) |
 
-Nothing returned starts with `/`, `..` or a drive letter. Set `root`, and paths are exact.
+Nothing returned for a mapped frame starts with `/`, `..` or a drive letter. (An unmapped frame shows the URL the browser reported, which is client text.) Set `root`, and paths are exact.
 
 ### Safety
 

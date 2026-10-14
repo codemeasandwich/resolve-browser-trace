@@ -18,16 +18,22 @@ function hooksTarget() {
   }
 }
 
-// every file copied from .hooks is a script git must be allowed to run
-function makeExecutable(from, to) {
+// Copies the hook files that are not there yet (a hook the developer already has is kept) and makes them executable.
+function installHooks(from, to, installed = [], kept = []) {
+  fs.mkdirSync(to, { recursive: true })
   for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
     const copied = path.join(to, entry.name)
     if (entry.isDirectory()) {
-      makeExecutable(path.join(from, entry.name), copied)
+      installHooks(path.join(from, entry.name), copied, installed, kept)
+    } else if (fs.existsSync(copied)) {
+      kept.push(entry.name)
     } else {
+      fs.copyFileSync(path.join(from, entry.name), copied)
       fs.chmodSync(copied, 0o755)
+      installed.push(entry.name)
     }
   }
+  return { installed, kept }
 }
 
 function sharedHooksPath() {
@@ -43,8 +49,6 @@ if (target && sharedHooksPath()) {
   // core.hooksPath often points at a folder shared by many repositories: never overwrite hooks there
   console.log('resolve-browser-trace: core.hooksPath is set, git hooks not installed (copy .hooks/* yourself if wanted)')
 } else if (target && fs.existsSync(source)) {
-  fs.mkdirSync(target, { recursive: true })
-  fs.cpSync(source, target, { recursive: true, force: false, errorOnExist: false }) // hooks already there are kept
-  makeExecutable(source, target)
-  console.log(`resolve-browser-trace: git hooks installed in ${target}`)
+  const { installed, kept } = installHooks(source, target)
+  console.log(`resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ') || 'none'}${kept.length ? `; kept your existing ${kept.join(', ')}` : ''}`)
 }

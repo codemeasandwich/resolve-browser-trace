@@ -285,11 +285,17 @@ describe('maps whose names are huge, disguised or bombs', () => {
   const sourceMap = (source, extra) => ({ version: 3, sources: [source], names: [], mappings: 'AAAA', ...extra })
   const first = async (source) => (await createResolver({ maps: { 'app.js': sourceMap(source) } })('    at f (https://h/app.js:1:1)'))[0]
 
-  test('a 6 MB source name on a 100-frame stack resolves, with a short source', async () => {
-    const frames = await createResolver({ maps: { 'app.js': sourceMap('a'.repeat(6e6)) } })(stack100)
+  test('a 3000-character source name on a 100-frame stack resolves, with a short source', async () => {
+    const frames = await createResolver({ maps: { 'app.js': sourceMap('a'.repeat(3000)) } })(stack100)
     expect(frames).toHaveLength(100)
     expect(frames[0].source.length).toBeLessThanOrEqual(1000)
     expect(frames.stack.length).toBeLessThan(200000)
+  })
+
+  test('a 6 MB source name is refused with the map, and the stack still resolves', async () => {
+    const frames = await createResolver({ maps: { 'app.js': sourceMap('a'.repeat(6e6)) } })(stack100)
+    expect(frames).toHaveLength(100)
+    expect(frames[0].mapped).toBe(false)
   })
 
   test('a source of 80000 "?" and a newline does not stall the event loop', async () => {
@@ -315,21 +321,103 @@ describe('maps whose names are huge, disguised or bombs', () => {
     expect((await first(source)).mapped).toBe(false)
   })
 
-  test('a map over maxMapBytes, or with over two million generated lines, is refused and reported', async () => {
+  test('a map over maxMapBytes, or with over four million segments or lines, is refused and reported', async () => {
     const reported = []
     const onError = (error) => reported.push(error.message)
     const real = fs.readFileSync(`${mapsDir('esbuild')}/${esbuildFile}.map`, 'utf8')
     const small = createResolver({ maps: { [esbuildFile]: real }, maxMapBytes: 1000, onError })
     expect((await small(realStack))[0].mapped).toBe(false)
-    const lines = createResolver({ maps: { 'app.js': sourceMap('a.ts', { mappings: `${';'.repeat(2_000_001)}AAAA` }) }, onError })
+    const lines = createResolver({ maps: { 'app.js': sourceMap('a.ts', { mappings: `${';'.repeat(4_000_001)}AAAA` }) }, onError })
     expect((await lines('    at f (https://h/app.js:1:1)'))[0].mapped).toBe(false)
     const long = createResolver({ maps: { 'app.js': sourceMap('a.ts', { mappings: 'A'.repeat(2000) }) }, maxMapBytes: 1000, onError })
     expect((await long('    at f (https://h/app.js:1:1)'))[0].mapped).toBe(false)
-    expect(reported).toEqual([expect.stringMatching(/maxMapBytes/), expect.stringMatching(/too many/), expect.stringMatching(/too many/)])
+    expect(reported).toEqual([expect.stringMatching(/maxMapBytes/), expect.stringMatching(/four million/), expect.stringMatching(/maxMapBytes/)])
   })
 
   test('a map just under the limits is used', async () => {
     const ok = createResolver({ maps: { 'app.js': sourceMap('a.ts', { mappings: `${';'.repeat(1000)}AAAA` }) } })
     expect((await ok('    at f (https://h/app.js:1001:1)'))[0]).toMatchObject({ mapped: true, source: 'a.ts' })
+  })
+})
+
+describe('maps that are small to store but expensive to open, and other leftovers', () => {
+  const sourceMap = (extra) => ({ version: 3, sources: ['a.ts'], names: [], mappings: 'AAAA', ...extra })
+  const frame = '    at f (https://h/app.js:1:1)'
+  const refused = async (map, options = {}) => {
+    const reported = []
+    const frames = await createResolver({ maps: { 'app.js': map }, onError: (e) => reported.push(e.message), ...options })(frame)
+    return { frames, reported }
+  }
+
+  test('a map of "A," repeated (millions of tiny segments) is refused', async () => {
+    const { frames, reported } = await refused(sourceMap({ mappings: 'A,'.repeat(4_100_000) }))
+    expect(frames[0].mapped).toBe(false)
+    expect(reported[0]).toMatch(/four million segments/)
+  })
+
+  test('mappings given as arrays instead of text are refused', async () => {
+    const { frames, reported } = await refused(sourceMap({ mappings: [[[0, 0, 0, 0]]] }))
+    expect(frames[0].mapped).toBe(false)
+    expect(reported).toHaveLength(1)
+  })
+
+  test.each([
+    ['a source name of 5000 characters', sourceMap({ sources: ['a'.repeat(5000)] })],
+    ['a sourceRoot of 5000 characters', sourceMap({ sourceRoot: 'a'.repeat(5000) })],
+    ['300000 sources', sourceMap({ sources: Array(300000).fill('a.ts') })],
+  ])('%s is refused', async (_, map) => {
+    expect((await refused(map)).frames[0].mapped).toBe(false)
+  })
+
+  test('the message onError receives stays short even for a huge map with no mappings', async () => {
+    const { reported } = await refused({ version: 3, sources: [], names: ['x'.repeat(5_000_000)] }, { maxMapBytes: 10_000_000 })
+    expect(reported).toHaveLength(1)
+    expect(reported[0].length).toBeLessThanOrEqual(500)
+  })
+
+  test('a map with mappings but no sources list is reported', async () => {
+    const { frames, reported } = await refused({ version: 3, mappings: 'AAAA' })
+    expect(frames[0].mapped).toBe(false)
+    expect(reported).toHaveLength(1)
+  })
+
+  test('a map file much larger than maxMapBytes is refused before it is read, and so is a huge Buffer', async () => {
+    const dir = fs.mkdtempSync(`${require('node:os').tmpdir()}/rbt-big-`)
+    fs.writeFileSync(`${dir}/app.js.map`, 'x'.repeat(100))
+    const reported = []
+    const frames = await createResolver({ mapsDir: dir, maxMapBytes: 10, onError: (e) => reported.push(e.message) })(frame)
+    expect(frames[0].mapped).toBe(false)
+    expect(reported[0]).toMatch(/file is larger than maxMapBytes \(10\)/)
+    const viaBuffer = await refused(Buffer.alloc(100, 'x'), { maxMapBytes: 10 })
+    expect(viaBuffer.reported[0]).toMatch(/maxMapBytes/)
+  })
+
+  test.each([
+    ['a line of zero', [[[0, 0, -1, 0]]]],
+    ['a negative line', [[[0, 0, -5, -5]]]],
+    ['a negative column', [[[0, 0, 0, -1]]]],
+  ])('%s from a decoded map is not reported as a position', async (_, decoded) => {
+    // the numbers are written as the VLQ text a real map would hold
+    const vlq = (n) => { let v = n < 0 ? (-n << 1) | 1 : n << 1; let out = ''; do { let d = v & 31; v >>>= 5; if (v) d |= 32; out += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'[d] } while (v); return out }
+    const [[segment]] = decoded
+    const { frames } = await refused(sourceMap({ mappings: segment.map(vlq).join('') }))
+    expect(frames[0].line === null || frames[0].line >= 1).toBe(true)
+    expect(frames[0].column === null || frames[0].column >= 1).toBe(true)
+  })
+
+  test('a huge source file gets no source line, a tab becomes a space, and lone surrogates are removed', async () => {
+    const make = (content) => createResolver({ maps: { 'app.js': sourceMap({ sourcesContent: [content] }) }, includeSource: true })(frame)
+    expect((await make('x'.repeat(600000)))[0].sourceLine).toBeNull()
+    expect((await make('return\tx'))[0].sourceLine).toBe('return x')
+    expect((await make('a\ud800b'))[0].sourceLine).toBe('ab')
+    const names = await createResolver({ maps: {} })(`    at a${'\u{1f600}'.repeat(150)} (u.js:1:1)`)
+    expect(names[0].name.isWellFormed()).toBe(true)
+  })
+
+  test('names and sources that are only blanks are treated as missing', async () => {
+    const blank = await createResolver({ maps: {} })('    at   (   :1:1)')
+    expect(blank[0]).toMatchObject({ name: null, source: null })
+    const mapped = await createResolver({ maps: { 'app.js': sourceMap({ sources: [' '] }) } })(frame)
+    expect(mapped[0].mapped).toBe(false)
   })
 })

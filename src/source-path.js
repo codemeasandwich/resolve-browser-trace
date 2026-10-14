@@ -19,9 +19,9 @@ const { sanitize } = require('./sanitize')
 // A source name longer than this is cut to its tail: nothing real is longer, and it bounds the work and the output.
 const MAX_SOURCE_LENGTH = 1000
 
-const SCHEME = /^([a-z][a-z0-9+.-]*):\/\/[^/]*\/?/i
+// "webpack:///x", "webpack://name/x", "vm:/x"; two or more letters, so "C:" stays a drive
+const SCHEME = /^([a-z][a-z0-9+.-]+):(\/\/[^/]*)?\/?/i
 const DRIVE_PREFIX = /^[a-z]:/i
-const DRIVE_SEGMENT = /^[a-z]:$/i
 // Schemes whose paths are project-relative; for any other scheme (file:, vm:, ...) the path is the machine's.
 const PROJECT_SCHEMES = new Set(['webpack', 'webpack-internal', 'turbopack', 'ng'])
 
@@ -30,17 +30,20 @@ function splitPath(path) {
   const segments = []
   let climbed = false
   let drive = false
-  for (const segment of path.split('/')) {
-    if (DRIVE_SEGMENT.test(segment)) {
-      drive = true // "C:" in the middle of a path ("./C:/Users/x.ts"); a drive is never part of a returned path
-    } else if (segment === '..') {
+  for (const part of path.split('/')) {
+    const segment = part.trim()
+    const withoutDrive = segment.replace(DRIVE_PREFIX, '')
+    if (withoutDrive !== segment) {
+      drive = true // "C:" or "C:foo" in the middle of a path ("./C:/Users/x.ts"); a drive is never part of a returned path
+    }
+    if (withoutDrive === '..') {
       if (segments.length === 0) {
         climbed = true
       } else {
         segments.pop()
       }
-    } else if (segment !== '' && segment !== '.') {
-      segments.push(segment)
+    } else if (!/^[.\s]*$/.test(withoutDrive)) {
+      segments.push(withoutDrive)
     }
   }
   return { segments, climbed, drive }
@@ -65,7 +68,8 @@ function normalizeSource(raw, root) {
   let environment = false
   const scheme = SCHEME.exec(path)
   if (scheme) {
-    environment = !PROJECT_SCHEMES.has(scheme[1].toLowerCase())
+    // a project scheme with a single slash ("webpack:/Users/..") is not the usual form: treat its path as the machine's
+    environment = !PROJECT_SCHEMES.has(scheme[1].toLowerCase()) || scheme[2] === undefined
     path = path.slice(scheme[0].length)
   }
   const query = path.search(/[?#]/)
