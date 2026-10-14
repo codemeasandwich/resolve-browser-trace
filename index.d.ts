@@ -34,7 +34,7 @@ declare namespace createResolver {
      * (`/srv/build/shop/src/app.tsx` becomes `src/app.tsx`).
      */
     root?: string
-    /** Add `sourceLine` (the original line of code, from the map's `sourcesContent`) to mapped frames. Default false. */
+    /** Add `sourceLine` (the original line of code, from the map's `sourcesContent`) to mapped frames. Default false. `null` for files over 500,000 characters or lines past 20,000. */
     includeSource?: boolean
     /** Called when a map exists but cannot be loaded or parsed. A missing map is not an error. */
     onError?: (error: unknown, info: { file: string }) => unknown
@@ -42,9 +42,9 @@ declare namespace createResolver {
     maxStackLength?: number
     /** Most frames returned for one stack. Default 100. */
     maxFrames?: number
-    /** Parsed maps kept in memory (least recently used leave first). Default 16. */
+    /** Parsed maps kept in memory (least recently used leave first). Default 16. Keep it above the number of bundles live at once, or maps are re-parsed constantly. */
     maxCachedMaps?: number
-    /** Largest map accepted, in characters of JSON (32 MiB). Bigger maps, maps with over four million segments or lines, and maps whose `mappings` are not text are reported to `onError` and not used. */
+    /** Largest map accepted, in characters of JSON (32 MiB). Bigger maps, maps whose `mappings` hold over four million `,`/`;` separators, and maps whose `mappings` are not text are reported to `onError` and not used. Memory per parsed map is roughly 14 to 40 bytes per character of `mappings`: budget this times `maxCachedMaps`. */
     maxMapBytes?: number
     /** Most maps opened for one stack; frames of further bundles stay unmapped. Default 4. */
     maxMapsPerStack?: number

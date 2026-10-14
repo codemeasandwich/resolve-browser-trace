@@ -18,7 +18,7 @@ or fixed, and the second list is what can change your results.
   or an object, so a `bun build --compile` binary can embed them), `loadMap(fileName)`, `root`, `includeSource`,
   `onError`, `maxStackLength`, `maxFrames`, `maxCachedMaps`, `maxMapsPerStack` and `maxMapBytes`. `createResolver('<folder>')` still works.
 - `mapped` on every frame; `frames.stack`, a readable rebuilt stack (not enumerable, so not in the JSON);
-  `formatStack(frames)`; optional `sourceLine` (the original line of code from `sourcesContent`).
+  `formatStack(frames)`; optional `sourceLine` (the original line of code from `sourcesContent`, `null` for files over 500,000 characters or lines past 20,000).
 - Stack parsers for Chrome / Edge / Node / Bun (V8), Firefox (SpiderMonkey) and Safari (JavaScriptCore), including
   async frames, `new`, method aliases, eval origins, `async*`, `promise callback*`, `global code`, `eval code`,
   `[native code]` and React `componentStack` text.
@@ -26,7 +26,7 @@ or fixed, and the second list is what can change your results.
 - Tests that are user stories run against real bundles (`bun build --minify` and esbuild, with and without code
   splitting) and `error.stack` strings recorded from Chrome, Edge, Firefox, Safari (WebKit), Node and Bun, with a
   100% coverage threshold. `LICENSE` (Apache-2.0), GitHub Actions for tests and for publishing with provenance,
-  a release script and git hooks.
+  a release script (it checks that HEAD is on origin and CI passed, and restores package.json if the version commit fails) and git hooks (commit subjects may carry a scope; `npm install` installs all of them or none, and never overwrites hooks you have).
 
 ### Fixed
 

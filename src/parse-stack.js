@@ -79,7 +79,7 @@ function parseGeckoFrame(text) {
  */
 function parseStack(text, limits) {
   const frames = []
-  const lines = text.split('\n')
+  const lines = text.split(/\r\n?|\n/) // \n, \r\n and a lone \r
   for (let i = 0; i < lines.length && frames.length < limits.maxFrames; i++) {
     const line = sanitize(lines[i]).trim()
     if (line.length === 0 || line.length > MAX_LINE_LENGTH) {

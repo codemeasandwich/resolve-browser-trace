@@ -145,3 +145,10 @@ describe('a stack with windows line endings, tabs and indentation of any size', 
     expect(frames.map((f) => f.name)).toEqual(['a', 'b'])
   })
 })
+
+describe('a stack whose lines end in a lone carriage return (old Mac style)', () => {
+  test('is read line by line', async () => {
+    const frames = await resolve('Error: x\r    at a (https://h/a.js:1:2)\r    at b (https://h/a.js:3:4)')
+    expect(frames.map((f) => f.name)).toEqual(['a', 'b'])
+  })
+})

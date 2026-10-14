@@ -102,27 +102,49 @@ describe('the git hooks', () => {
     expect(execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: bare, encoding: 'utf8' })).toBe('')
   })
 
-  test('a hooks folder that cannot take the hook does not make npm install fail', () => {
-    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-dangling-'))
+  function repoWithScript() {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-hooks-'))
     execFileSync('git', ['init', '-q'], { cwd: repo })
-    fs.symlinkSync('/nonexistent/hook', path.join(repo, '.git', 'hooks', 'commit-msg')) // a dangling link
     fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
     fs.mkdirSync(path.join(repo, 'scripts'))
     fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
-    const out = execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo, encoding: 'utf8' })
-    expect(out).toMatch(/kept your existing commit-msg/)
+    return repo
+  }
+  const install = (repo) => spawnSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo, encoding: 'utf8' })
+
+  test('a hooks folder that cannot be written does not make npm install fail (exit 0, says so)', () => {
+    if (process.getuid && process.getuid() === 0) {
+      return // root can write anywhere
+    }
+    const repo = repoWithScript()
+    const hooks = path.join(repo, '.git', 'hooks')
+    fs.chmodSync(hooks, 0o555)
+    try {
+      const result = install(repo)
+      expect(result.status).toBe(0)
+      expect(result.stdout).toMatch(/git hooks not installed \(/)
+      expect(fs.readdirSync(hooks).filter((f) => !f.endsWith('.sample'))).toEqual([])
+    } finally {
+      fs.chmodSync(hooks, 0o755)
+    }
   })
 
-  test('a hook the developer already has is kept', () => {
-    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-own-'))
-    execFileSync('git', ['init', '-q'], { cwd: repo })
+  test('if the developer already has any of the hooks (even a dangling link) none is installed: all or none', () => {
+    const repo = repoWithScript()
+    fs.symlinkSync('/nonexistent/hook', path.join(repo, '.git', 'hooks', 'commit-msg'))
+    const result = install(repo)
+    expect(result.status).toBe(0)
+    expect(result.stdout).toMatch(/not installed: you already have commit-msg/)
+    expect(fs.existsSync(path.join(repo, '.git', 'hooks', 'pre-commit'))).toBe(false)
+    expect(fs.readlinkSync(path.join(repo, '.git', 'hooks', 'commit-msg'))).toBe('/nonexistent/hook')
+  })
+
+  test('a hook the developer already has is kept as it is', () => {
+    const repo = repoWithScript()
     fs.writeFileSync(path.join(repo, '.git', 'hooks', 'pre-commit'), '# my own hook\n')
-    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
-    fs.mkdirSync(path.join(repo, 'scripts'))
-    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
-    execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo })
+    install(repo)
     expect(fs.readFileSync(path.join(repo, '.git', 'hooks', 'pre-commit'), 'utf8')).toBe('# my own hook\n')
-    expect(fs.existsSync(path.join(repo, '.git', 'hooks', 'commit-msg'))).toBe(true)
+    expect(fs.existsSync(path.join(repo, '.git', 'hooks', 'commit-msg'))).toBe(false)
   })
 
   test('when core.hooksPath is set (hooks shared by many repositories) nothing is written there', () => {
@@ -148,6 +170,9 @@ describe('the git hooks', () => {
     }
     expect(check('feat: add a thing')).toBe(0)
     expect(check('fix!: break a thing')).toBe(0)
+    expect(check('fix(parser): handle async frames')).toBe(0)
+    expect(check('feat(api)!: rename a thing')).toBe(0)
+    expect(check('feat(): empty scope')).toBe(1)
     expect(check('added a thing')).toBe(1)
     expect(check(`feat: ${'x'.repeat(80)}`)).toBe(1)
   })

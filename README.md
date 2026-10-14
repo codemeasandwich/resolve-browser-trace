@@ -63,12 +63,12 @@ call 0.x versions used (`setup` is kept as another name for `createResolver`).
 | `maps` | | Maps in memory, keyed by bundle file name: `{ 'app-1a2b3c.js': jsonTextBufferOrObject }`. Parsed when first needed, then cached. |
 | `loadMap` | | `(fileName) => map \| null \| Promise<map \| null>`. Called with the bundle file name; return its map or `null`. The name comes from the client, so treat it as untrusted. Misses are not cached and there is no timeout, and one stack can call it up to `maxMapsPerStack` times: cache misses and bound the time yourself if it reaches a database or the network. |
 | `root` | | The folder your bundler ran in, for example `/srv/build/shop`. Source paths under it come back relative to it. |
-| `includeSource` | `false` | Add `sourceLine`, the original line of code from the map's `sourcesContent`. Off by default because it puts source code in your logs. |
+| `includeSource` | `false` | Add `sourceLine`, the original line of code from the map's `sourcesContent`. Off by default because it puts source code in your logs. It is `null` when the file is over 500,000 characters or the line is past 20,000. |
 | `onError` | | `(error, { file })`, called when a map exists but cannot be loaded or parsed. A map that does not exist is not an error. |
 | `maxStackLength` | `65536` | Characters of stack text read; the rest is ignored. |
 | `maxFrames` | `100` | Frames returned for one stack. |
-| `maxCachedMaps` | `16` | Parsed maps kept in memory, least recently used out first. |
-| `maxMapBytes` | `33554432` | Largest map accepted, in characters of JSON. Bigger maps, maps with over four million segments or lines, and maps whose `mappings` are not text are reported to `onError` and not used. |
+| `maxCachedMaps` | `16` | Parsed maps kept in memory, least recently used out first. Keep it above the number of bundles that are live at once (older releases' maps count too), or maps are re-read and re-parsed all the time. |
+| `maxMapBytes` | `33554432` | Largest map accepted, in characters of JSON. Bigger maps, maps whose `mappings` hold over four million `,`/`;` separators, and maps whose `mappings` are not text are reported to `onError` and not used. The separator count does not bound memory by itself: a parsed map costs roughly 14 to 40 bytes of heap per character of `mappings`, so budget `maxMapBytes` times `maxCachedMaps` for the worst case (a 32 MiB pathological map held about 600 MB). |
 | `maxMapsPerStack` | `4` | Most maps opened for one stack; frames of further bundles stay unmapped. Parsing a map is synchronous work, so this bounds what one request can cost. |
 
 At least one of `mapsDir`, `maps` and `loadMap` is required (otherwise `createResolver` throws a `TypeError`).
@@ -133,7 +133,7 @@ Maps record file names in many styles. They come back as short project paths:
 | anything in `node_modules` | `node_modules/<package>/...` |
 | an absolute path outside `root` (or no `root`) | `src/...` from its last `src` folder, else its last two segments (which can include one folder name, so set `root`) |
 
-Nothing returned for a mapped frame starts with `/` or a drive letter, and none of its segments is `..`, `.` or blank. (An unmapped frame shows the URL the browser reported, which is client text.) Set `root`, and paths are exact.
+Nothing returned for a mapped frame starts with `/`, a blank or a drive letter, and none of its segments is `..`, `.` or blank (blank includes invisible glyphs such as the Hangul filler and the Braille blank). Percent-encoding is not decoded: `%2e%2e` is an ordinary name. (An unmapped frame shows the URL the browser reported, which is client text.) Set `root`, and paths are exact.
 
 ### Safety
 

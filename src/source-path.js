@@ -57,6 +57,19 @@ function splitPath(path) {
   return { segments, climbed, drive }
 }
 
+// The last word: whatever the rules above produced, what is returned never starts with a slash, blank or drive
+// prefix, and has no "..", "." or blank segment. Repeats until nothing changes (stripping one thing can expose another).
+function finish(segments) {
+  let joined = segments.join('/')
+  for (;;) {
+    const next = splitPath(joined.replace(/^[\s/\\]+/, '').replace(DRIVE_PREFIX, '')).segments.join('/')
+    if (next === joined) {
+      return joined === '' ? null : joined
+    }
+    joined = next
+  }
+}
+
 /**
  * Pure string work; nothing is resolved on disk.
  * @param {string} root absolute project root (any slash style), or ''
@@ -88,24 +101,21 @@ function normalizeSource(raw, root) {
   path = path.replace(DRIVE_PREFIX, '').trim().replace(/^\/@fs\//, '/') // "/@fs/" is how Vite names files outside its root
   const { segments, climbed, drive } = splitPath(path)
   environment = environment || drive
-  if (segments.length === 0) {
-    return null
-  }
   const modules = segments.indexOf('node_modules')
   if (modules !== -1) {
-    return segments.slice(modules).join('/')
+    return finish(segments.slice(modules))
   }
   if (!environment && !climbed) {
-    return segments.join('/')
+    return finish(segments)
   }
   if (root.length > 0 && root.length < segments.length && root.every((part, i) => part === segments[i])) {
-    return segments.slice(root.length).join('/')
+    return finish(segments.slice(root.length))
   }
   const src = segments.lastIndexOf('src')
   if (src !== -1 && src < segments.length - 1) {
-    return segments.slice(src).join('/')
+    return finish(segments.slice(src))
   }
-  return segments.slice(-2).join('/')
+  return finish(segments.slice(-2))
 }
 
 module.exports = { normalizeSource, rootSegments }

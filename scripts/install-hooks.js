@@ -18,22 +18,27 @@ function hooksTarget() {
   }
 }
 
-// Copies the hook files that are not there yet (a hook the developer already has is kept) and makes them executable.
-function installHooks(from, to, installed = [], kept = []) {
-  fs.mkdirSync(to, { recursive: true })
-  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-    const copied = path.join(to, entry.name)
-    if (entry.isDirectory()) {
-      installHooks(path.join(from, entry.name), copied, installed, kept)
-    } else if (fs.lstatSync(copied, { throwIfNoEntry: false })) {
-      kept.push(entry.name)
-    } else {
-      fs.copyFileSync(path.join(from, entry.name), copied)
-      fs.chmodSync(copied, 0o755)
-      installed.push(entry.name)
-    }
+// The files under .hooks, as paths relative to it.
+function hookFiles(dir, prefix = '') {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? hookFiles(path.join(dir, entry.name), `${prefix}${entry.name}/`) : [`${prefix}${entry.name}`]
+  )
+}
+
+// All or none: if the developer already has any of these hooks, none is installed (half a set of checks, for
+// example a commit-msg rule without the coverage check that goes with it, would be worse than neither).
+function installHooks(from, to) {
+  const files = hookFiles(from)
+  const kept = files.filter((file) => fs.lstatSync(path.join(to, file), { throwIfNoEntry: false }))
+  if (kept.length > 0) {
+    return { installed: [], kept }
   }
-  return { installed, kept }
+  for (const file of files) {
+    fs.mkdirSync(path.dirname(path.join(to, file)), { recursive: true })
+    fs.copyFileSync(path.join(from, file), path.join(to, file))
+    fs.chmodSync(path.join(to, file), 0o755)
+  }
+  return { installed: files, kept }
 }
 
 function sharedHooksPath() {
@@ -51,7 +56,11 @@ if (target && sharedHooksPath()) {
 } else if (target && fs.existsSync(source)) {
   try {
     const { installed, kept } = installHooks(source, target)
-    console.log(`resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ') || 'none'}${kept.length ? `; kept your existing ${kept.join(', ')}` : ''}`)
+    console.log(
+      kept.length > 0
+        ? `resolve-browser-trace: git hooks not installed: you already have ${kept.join(', ')} in ${target}`
+        : `resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ')}`
+    )
   } catch (error) {
     // a hooks folder that cannot be written must not make `npm install` fail
     console.log(`resolve-browser-trace: git hooks not installed (${error.message})`)

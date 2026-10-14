@@ -106,6 +106,27 @@ describe('names that merely look like schemes or drives are kept', () => {
   })
 })
 
+describe('invisible glyphs and percent-encoding', () => {
+  test('segments made of blank-looking letters (Hangul filler, Braille blank) are dropped like blanks', async () => {
+    expect(await sourcesOf(replacing({ cart: 'src/\u3164/\u2800/cart.ts', app: 'src/app.tsx' }))).toEqual(['src/cart.ts', 'src/cart.ts', 'src/app.tsx'])
+  })
+
+  test('percent-encoding is not decoded: "%2e%2e" is an ordinary name, and is not a traversal', async () => {
+    expect(await sourcesOf(replacing({ cart: '%2e%2e/src/cart.ts', app: 'src/app.tsx' }))).toEqual(['%2e%2e/src/cart.ts', '%2e%2e/src/cart.ts', 'src/app.tsx'])
+  })
+})
+
+describe('a drive-like piece exposed by the last cut is removed too', () => {
+  test.each([
+    [' C: C:x.ts', 'x.ts'],
+    ['/C: C:x.ts', 'x.ts'],
+    ['/q/r/s/a:b/c', 'b/c'],
+    ['\\\\\\\\vm:/a:b/Users', 'b/Users'],
+  ])('%j becomes %j', async (source, expected) => {
+    expect(await sourcesOf(replacing({ cart: source, app: source }))).toEqual([expected, expected, expected])
+  })
+})
+
 describe('whatever the map says, no result is an absolute or climbing path', () => {
   test.each([
     ['../../../../../etc/passwd'],
@@ -156,5 +177,47 @@ describe('whatever the map says, no result is an absolute or climbing path', () 
   test('a map whose source names nothing at all leaves the frame unmapped, with its own script URL', async () => {
     const frames = await createResolver({ maps: { [file]: { ...realMap, sources: Array(5).fill('..') } } })(chrome)
     expect(frames[0]).toMatchObject({ mapped: false, line: 1, column: 301 })
+  })
+})
+
+describe('property: whatever tokens a map names a source with, the invariant of the README holds', () => {
+  // A deterministic pseudo-random walk over the pieces of paths that have caused trouble: drives with and without
+  // blanks between them, schemes, dot segments, backslashes, query marks, node_modules, src, look-alike names,
+  // percent-encoded dots and glyphs that are invisible.
+  const TOKENS = [
+    'c:', 'C:', ' ', '  ', '/', '\\', '/', '..', '.', '...', 'src', 'lib', 'a:b', 'x', 'y.ts', 'webpack://', 'webpack:///', 'vm:/',
+    'file:///', 'file:', '%2e%2e', 'ㅤ', '⠀', '​', '\u0001', '?', '#', '\n', 'node_modules', '@fs/', '~', 'c:c:',
+  ]
+  let seed = 20261014
+  const next = (n) => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+    return seed % n
+  }
+  const CASES = 40000
+  const sources = Array.from({ length: CASES }, () => Array.from({ length: 1 + next(10) }, () => TOKENS[next(TOKENS.length)]).join(''))
+
+  test('every mapped source: no leading slash, blank or drive; no .., . or blank segment; no invisible glyph', async () => {
+    const resolve = createResolver({
+      loadMap: (name) => ({ version: 3, sources: [sources[Number(name.slice(1, -3))]], names: [], mappings: 'AAAA' }),
+      maxCachedMaps: 1,
+      maxMapsPerStack: 1,
+      root: '/ci/build',
+    })
+    const violations = []
+    for (let i = 0; i < CASES; i++) {
+      const [frame] = await resolve(`    at f (https://h/f${i}.js:1:1)`)
+      if (!frame.mapped) {
+        continue
+      }
+      const bad =
+        /^[\s/\\]/.test(frame.source) ||
+        /^[a-z]:/i.test(frame.source) ||
+        frame.source.split('/').some((segment) => segment.trim() === '' || segment === '.' || segment === '..') ||
+        /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}ㅤ⠀]/u.test(frame.source)
+      if (bad) {
+        violations.push([sources[i], frame.source])
+      }
+    }
+    expect(violations.slice(0, 5)).toEqual([])
   })
 })

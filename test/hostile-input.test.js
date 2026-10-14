@@ -419,7 +419,7 @@ describe('maps that are small to store but expensive to open, and other leftover
     expect((await make('return\tx'))[0].sourceLine).toBe('return x')
     expect((await make('a\ud800b'))[0].sourceLine).toBe('ab')
     const names = await createResolver({ maps: {} })(`    at a${'\u{1f600}'.repeat(150)} (u.js:1:1)`)
-    expect(names[0].name.isWellFormed()).toBe(true)
+    expect(() => encodeURIComponent(names[0].name)).not.toThrow() // no half emoji left by the cut (isWellFormed needs Node 20)
   })
 
   test('names and sources that are only blanks are treated as missing', async () => {

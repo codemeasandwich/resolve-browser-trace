@@ -29,8 +29,9 @@ function bundleFileName(file) {
 }
 
 // Decoding allocates an array per generated line and per segment (about 40 bytes of heap per input byte for
-// "A,A,A,"), so the byte limit alone does not bound memory: a map is also limited by its number of segments,
-// and by the size of the lists and names it declares. Real maps are far inside all of these.
+// "A,A,A,"), so the byte limit alone does not bound memory: a map is also limited by its number of `,` and `;`
+// separators, and by the size of the lists and names it declares. Real maps are far inside all of these. The real
+// per-map bound is maxMapBytes (14 to 40 bytes of heap per character), times maxCachedMaps for the cache.
 const MAX_SEGMENTS = 4_000_000
 const MAX_SOURCES = 200_000
 const MAX_SOURCE_NAME_LENGTH = 4096

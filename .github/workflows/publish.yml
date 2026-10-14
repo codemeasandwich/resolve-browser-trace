@@ -1,9 +1,11 @@
 name: Publish to npm with Provenance
 
-# Runs when a GitHub release is published (npm run release creates one). Needs one of:
+# Runs when a GitHub release is published (npm run release creates one). Needs ONE of:
 #   - an NPM_TOKEN repository secret (an npm automation token), used below; or
-#   - npm Trusted Publishing configured for this repository and workflow on npmjs.com, in which case the token
-#     can be removed (provenance uses the same id-token permission).
+#   - npm Trusted Publishing configured for this repository and this workflow file on npmjs.com. Then delete the
+#     NODE_AUTH_TOKEN line below: the publish job already has `id-token: write` and installs npm >= 11.5.1, which
+#     Trusted Publishing needs (the npm that ships with Node 20 and 22 is older).
+# Pre-releases are never published from here, and neither is a commit that is not on the default branch.
 
 on:
   release:
@@ -21,11 +23,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -36,31 +40,40 @@ jobs:
 
   publish:
     needs: test
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && !github.event.release.prerelease
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write  # Required for npm provenance
+      id-token: write  # Required for npm provenance (and Trusted Publishing)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the release is this package version, on the default branch
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          test "v$(node -p "require('./package.json').version")" = "$TAG"
+          git fetch --quiet origin "$DEFAULT_BRANCH"
+          git merge-base --is-ancestor HEAD "origin/$DEFAULT_BRANCH"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Install npm 11.5.1 or later (needed for Trusted Publishing)
+        run: npm install -g npm@^11.5.1
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Check the release tag matches package.json
-        env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: |
-          test "v$(node -p "require('./package.json').version")" = "$TAG"
-
       - name: Publish to npm with provenance
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

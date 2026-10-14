@@ -13,14 +13,15 @@ FIRST_LINE=$(sed -n '1p' "$MSG_FILE" | tr -d '\r')
 
 TYPES="build|ci|docs|feat|fix|perf|refactor|style|test"
 
-# Must match: ^(type)(optional !)?: <message-with-at-least-one-non-space-char>
-if ! printf '%s\n' "$FIRST_LINE" | grep -Eqi "^(${TYPES})(!)?:[[:space:]]*[^[:space:]]"; then
+# Must match: type, optional (scope), optional !, then ": " and at least one non-space character
+if ! printf '%s\n' "$FIRST_LINE" | grep -Eqi "^(${TYPES})(\([^)]+\))?(!)?:[[:space:]]*[^[:space:]]"; then
   cat >&2 <<'ERR'
 ERROR: Commit message header invalid.
-Required format: <type><!optional>: <message>
+Required format: <type>[(scope)][!]: <message>
 Where <type> is one of: build, ci, docs, feat, fix, perf, refactor, style, test
 Examples:
   feat: add user profile
+  fix(parser): handle async frames
   feat!: change authentication API (breaking)
 
 Make sure there's a non-empty message after ": ".
