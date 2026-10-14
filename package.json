@@ -1,10 +1,43 @@
 {
   "name": "resolve-browser-trace",
-  "version": "0.10.1",
-  "description": "node library to use client side source map to resolve stacktraces",
-  "main": "index.js",
+  "version": "1.0.0",
+  "description": "Rebuild minified browser error stacks into original source files, lines, columns and function names on the server, using source maps that production never serves.",
+  "main": "./index.js",
+  "module": "./index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./index.mjs"
+      },
+      "require": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "index.d.ts",
+    "index.d.mts",
+    "src/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "test": "jest"
+    "prepare": "node scripts/install-hooks.js",
+    "test": "jest --coverage --no-cache",
+    "test:watch": "jest --watch --runInBand",
+    "test:types": "tsc -p test/types/tsconfig.json",
+    "fixtures": "node scripts/make-fixtures.js",
+    "release": "bash scripts/publish.sh"
   },
   "repository": {
     "type": "git",
@@ -12,16 +45,53 @@
   },
   "keywords": [
     "source-map",
-    "browser"
+    "sourcemap",
+    "stack-trace",
+    "stacktrace",
+    "browser",
+    "error-monitoring",
+    "production",
+    "bun",
+    "minified"
   ],
   "author": "Brian Shannon (http://www.codemeasandwich.com)",
-  "license": "apache 2",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/codemeasandwich/resolve-browser-trace/issues"
   },
   "homepage": "https://github.com/codemeasandwich/resolve-browser-trace#readme",
   "dependencies": {
-    "source-map": "0.7.3",
-    "stacktrace-parser":"0.1.10"
+    "@jridgewell/trace-mapping": "^0.3.31"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.2",
+    "jest": "^29.3.1",
+    "typescript": "^5.9.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/test/fixtures/",
+      "/test/types/"
+    ],
+    "collectCoverageFrom": [
+      "index.js",
+      "src/**/*.js"
+    ],
+    "coverageReporters": [
+      "text",
+      "json-summary",
+      "json",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      }
+    }
   }
 }
