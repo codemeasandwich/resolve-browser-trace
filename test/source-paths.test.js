@@ -111,6 +111,10 @@ describe('invisible glyphs and percent-encoding', () => {
     expect(await sourcesOf(replacing({ cart: 'src/\u3164/\u2800/cart.ts', app: 'src/app.tsx' }))).toEqual(['src/cart.ts', 'src/cart.ts', 'src/app.tsx'])
   })
 
+  test('variation selectors (U+E0100) and Mongolian free variation selectors (U+180B) are dropped too', async () => {
+    expect(await sourcesOf(replacing({ cart: 'src/\u{e0100}/\u180b/cart.ts', app: 'src/\u{e0100}app.tsx' }))).toEqual(['src/cart.ts', 'src/cart.ts', 'src/app.tsx'])
+  })
+
   test('percent-encoding is not decoded: "%2e%2e" is an ordinary name, and is not a traversal', async () => {
     expect(await sourcesOf(replacing({ cart: '%2e%2e/src/cart.ts', app: 'src/app.tsx' }))).toEqual(['%2e%2e/src/cart.ts', '%2e%2e/src/cart.ts', 'src/app.tsx'])
   })
@@ -186,7 +190,7 @@ describe('property: whatever tokens a map names a source with, the invariant of 
   // percent-encoded dots and glyphs that are invisible.
   const TOKENS = [
     'c:', 'C:', ' ', '  ', '/', '\\', '/', '..', '.', '...', 'src', 'lib', 'a:b', 'x', 'y.ts', 'webpack://', 'webpack:///', 'vm:/',
-    'file:///', 'file:', '%2e%2e', 'ㅤ', '⠀', '​', '\u0001', '?', '#', '\n', 'node_modules', '@fs/', '~', 'c:c:',
+    'file:///', 'file:', '%2e%2e', '\u3164', '\u2800', '\u200b', '\u{e0100}', '\u180b', '\u{e01ef}', '\u0001', '?', '#', '\n', 'node_modules', '@fs/', '~', 'c:c:',
   ]
   let seed = 20261014
   const next = (n) => {
@@ -213,7 +217,7 @@ describe('property: whatever tokens a map names a source with, the invariant of 
         /^[\s/\\]/.test(frame.source) ||
         /^[a-z]:/i.test(frame.source) ||
         frame.source.split('/').some((segment) => segment.trim() === '' || segment === '.' || segment === '..') ||
-        /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}ㅤ⠀]/u.test(frame.source)
+        /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}\u2800]/u.test(frame.source)
       if (bad) {
         violations.push([sources[i], frame.source])
       }

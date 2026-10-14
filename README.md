@@ -68,7 +68,7 @@ call 0.x versions used (`setup` is kept as another name for `createResolver`).
 | `maxStackLength` | `65536` | Characters of stack text read; the rest is ignored. |
 | `maxFrames` | `100` | Frames returned for one stack. |
 | `maxCachedMaps` | `16` | Parsed maps kept in memory, least recently used out first. Keep it above the number of bundles that are live at once (older releases' maps count too), or maps are re-read and re-parsed all the time. |
-| `maxMapBytes` | `33554432` | Largest map accepted, in characters of JSON. Bigger maps, maps whose `mappings` hold over four million `,`/`;` separators, and maps whose `mappings` are not text are reported to `onError` and not used. The separator count does not bound memory by itself: a parsed map costs roughly 14 to 40 bytes of heap per character of `mappings`, so budget `maxMapBytes` times `maxCachedMaps` for the worst case (a 32 MiB pathological map held about 600 MB). |
+| `maxMapBytes` | `33554432` | Largest map accepted, in characters of JSON. Bigger maps, maps whose `mappings` hold over four million `,`/`;` separators, and maps whose `mappings` are not text are reported to `onError` and not used. The separator count does not bound memory by itself: a parsed map costs roughly 14 to 40 bytes of heap per character of `mappings`, so budget `maxMapBytes` times `maxCachedMaps` for the worst case (a pathological 32 MiB map held about 450 to 600 MB). |
 | `maxMapsPerStack` | `4` | Most maps opened for one stack; frames of further bundles stay unmapped. Parsing a map is synchronous work, so this bounds what one request can cost. |
 
 At least one of `mapsDir`, `maps` and `loadMap` is required (otherwise `createResolver` throws a `TypeError`).
@@ -317,6 +317,13 @@ The tests are user stories through the public API, run against bundles that `bun
 produced from the TSX app in `test/fixtures/src`, and against `error.stack` strings recorded from real Chrome, Edge,
 Firefox, Safari (WebKit), Node and Bun running those bundles. `npm install` installs the git hooks from `.hooks`
 (conventional commit subjects, and on `main`/`master` the 100% coverage check).
+
+## Releasing
+
+`npm run release` (from `main`/`master`, with everything pushed and CI green) tests, bumps the version if needed,
+and creates a GitHub release. The `publish.yml` workflow then publishes to npm with provenance using **npm Trusted
+Publishing**: once, on npmjs.com, open the package's settings and add a Trusted Publisher (GitHub Actions, this
+repository, workflow file `publish.yml`). There is no npm token and no repository secret to manage.
 
 ## License
 

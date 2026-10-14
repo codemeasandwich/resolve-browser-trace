@@ -18,6 +18,10 @@ function hooksTarget() {
   }
 }
 
+function sameFile(a, b) {
+  return fs.lstatSync(b).isFile() && fs.readFileSync(a).equals(fs.readFileSync(b))
+}
+
 // The files under .hooks, as paths relative to it.
 function hookFiles(dir, prefix = '') {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -29,7 +33,12 @@ function hookFiles(dir, prefix = '') {
 // example a commit-msg rule without the coverage check that goes with it, would be worse than neither).
 function installHooks(from, to) {
   const files = hookFiles(from)
-  const kept = files.filter((file) => fs.lstatSync(path.join(to, file), { throwIfNoEntry: false }))
+  const existing = files.filter((file) => fs.lstatSync(path.join(to, file), { throwIfNoEntry: false }))
+  // a file identical to ours was put there by an earlier run of this script
+  const kept = existing.filter((file) => !sameFile(path.join(from, file), path.join(to, file)))
+  if (kept.length === 0 && existing.length === files.length) {
+    return { installed: [], kept, upToDate: true }
+  }
   if (kept.length > 0) {
     return { installed: [], kept }
   }
@@ -55,12 +64,16 @@ if (target && sharedHooksPath()) {
   console.log('resolve-browser-trace: core.hooksPath is set, git hooks not installed (copy .hooks/* yourself if wanted)')
 } else if (target && fs.existsSync(source)) {
   try {
-    const { installed, kept } = installHooks(source, target)
-    console.log(
-      kept.length > 0
-        ? `resolve-browser-trace: git hooks not installed: you already have ${kept.join(', ')} in ${target}`
-        : `resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ')}`
-    )
+    const { installed, kept, upToDate } = installHooks(source, target)
+    if (upToDate) {
+      console.log('resolve-browser-trace: git hooks up to date')
+    } else {
+      console.log(
+        kept.length > 0
+          ? `resolve-browser-trace: git hooks not installed: you already have ${kept.join(', ')} in ${target}`
+          : `resolve-browser-trace: git hooks installed in ${target}: ${installed.join(', ')}`
+      )
+    }
   } catch (error) {
     // a hooks folder that cannot be written must not make `npm install` fail
     console.log(`resolve-browser-trace: git hooks not installed (${error.message})`)

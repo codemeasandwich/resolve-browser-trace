@@ -139,6 +139,25 @@ describe('the git hooks', () => {
     expect(fs.readlinkSync(path.join(repo, '.git', 'hooks', 'commit-msg'))).toBe('/nonexistent/hook')
   })
 
+  test('running it again when its own hooks are already there says they are up to date and changes nothing', () => {
+    const repo = repoWithScript()
+    expect(install(repo).stdout).toMatch(/git hooks installed/)
+    const hook = path.join(repo, '.git', 'hooks', 'pre-commit')
+    const before = fs.statSync(hook).mtimeMs
+    const again = install(repo)
+    expect(again.status).toBe(0)
+    expect(again.stdout).toBe('resolve-browser-trace: git hooks up to date\n')
+    expect(fs.statSync(hook).mtimeMs).toBe(before)
+  })
+
+  test('if one of its own hooks went missing, running it again installs the set again', () => {
+    const repo = repoWithScript()
+    install(repo)
+    fs.rmSync(path.join(repo, '.git', 'hooks', 'pre-commit.d'), { recursive: true })
+    expect(install(repo).stdout).toMatch(/git hooks installed/)
+    expect(fs.existsSync(path.join(repo, '.git', 'hooks', 'pre-commit.d', 'check-coverage.sh'))).toBe(true)
+  })
+
   test('a hook the developer already has is kept as it is', () => {
     const repo = repoWithScript()
     fs.writeFileSync(path.join(repo, '.git', 'hooks', 'pre-commit'), '# my own hook\n')
