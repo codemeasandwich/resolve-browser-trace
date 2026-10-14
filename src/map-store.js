@@ -14,7 +14,8 @@ const { TraceMap, decodedMappings } = require('@jridgewell/trace-mapping')
 
 // "app-1a2b3c.js", "chunk-QMLZOCCF.js", "main.5f3e.chunk.js", "index-BzS2xa1Q.js", "worker.mjs": a script file name and
 // nothing else (no slash, no "..", no HTML page that holds an inline script).
-const SAFE_FILE_NAME = /^[\w.@+~=,-]{1,255}\.(?:m|c)?js$/
+// Short enough for "<name>.map" to fit a file system, and not a Windows device name (con.js, nul.js, ...).
+const SAFE_FILE_NAME = /^(?!(?:con|prn|aux|nul|com\d|lpt\d)\.)[\w.@+~=,-]{1,240}\.(?:m|c)?js$/i
 
 /**
  * "https://shop.example/assets/app-1a2b.js?v=3#x" -> "app-1a2b.js"; null when it is not a plain file name.
@@ -30,6 +31,9 @@ function bundleFileName(file) {
 function toTraceMap(raw) {
   if (raw instanceof Uint8Array) {
     raw = Buffer.from(raw).toString('utf8')
+  }
+  if (typeof raw === 'string' && raw.charCodeAt(0) === 0xfeff) {
+    raw = raw.slice(1) // a byte order mark in front of the JSON
   }
   if (typeof raw !== 'string' && (typeof raw !== 'object' || raw === null)) {
     throw new TypeError('a source map must be a JSON string, a Buffer or an object')
@@ -84,7 +88,8 @@ function createMapStore(options) {
     } catch (error) {
       try {
         if (onError) {
-          onError(error, { file: name })
+          // Promise.resolve: an async onError that rejects must not become an unhandled rejection either
+          Promise.resolve(onError(error, { file: name })).catch(() => {})
         }
       } catch {
         // a throwing logger must not turn a bad map into a rejected resolve

@@ -12,26 +12,32 @@
 // The caller bounds the input; MAX_LINE_LENGTH additionally keeps every regular expression below linear-ish.
 
 const MAX_LINE_LENGTH = 2000
+// Control characters (including \r, ANSI escapes, line and paragraph separators) never belong in a frame, and in a log
+// line they could fake another frame or rewrite the terminal.
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g
 
 // "eval at <fn> (<url>:<line>:<col>), <anonymous>:1:5" -> the place that called eval is the part a source map knows.
 const EVAL_ORIGIN = /^eval at [^(]*\((.*?):(\d+):(\d+)\)(?:, .*)?$/
 const WITH_COLUMN = /^(.*):(\d+):(\d+)$/
 const WITH_LINE = /^(.*):(\d+)$/
 
+// Digits that are not a safe integer ("1" followed by 400 more) are not a position.
+const position = (digits) => (Number.isSafeInteger(+digits) ? +digits : null)
+
 // "https://host/app.js:1:301" -> { file, line, column }; anything else is kept whole as the "file" ("<anonymous>", "native").
 function parseLocation(location) {
   let match = EVAL_ORIGIN.exec(location)
   if (match) {
     // nested evals read "eval at a (eval at b (url", keep what follows the last "("
-    return { file: match[1].slice(match[1].lastIndexOf('(') + 1), line: +match[2], column: +match[3] }
+    return { file: match[1].slice(match[1].lastIndexOf('(') + 1), line: position(match[2]), column: position(match[3]) }
   }
   match = WITH_COLUMN.exec(location)
   if (match) {
-    return { file: match[1], line: +match[2], column: +match[3] }
+    return { file: match[1], line: position(match[2]), column: position(match[3]) }
   }
   match = WITH_LINE.exec(location)
   if (match) {
-    return { file: match[1], line: +match[2], column: null }
+    return { file: match[1], line: position(match[2]), column: null }
   }
   return { file: location, line: null, column: null }
 }
@@ -77,7 +83,7 @@ function parseStack(text, limits) {
   const frames = []
   const lines = text.split('\n')
   for (let i = 0; i < lines.length && frames.length < limits.maxFrames; i++) {
-    const line = lines[i].trim()
+    const line = lines[i].replace(CONTROL_CHARACTERS, '').trim()
     if (line.length === 0 || line.length > MAX_LINE_LENGTH) {
       continue
     }

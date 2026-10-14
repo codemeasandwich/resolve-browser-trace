@@ -39,7 +39,8 @@ or fixed, and the second list is what can change your results.
 - Every new bundle name listed the whole maps folder with `fs.readdir`. The exact `<name>.map` is read instead.
 - The cache was keyed by client-controlled text and grew without limit; consumers were never destroyed, leaking
   WebAssembly memory. The cache is now an LRU of parsed maps, only real maps are cached, and input is capped
-  (65536 characters, 100 frames, 2000 characters per line).
+  (65536 characters, 100 frames, 2000 characters per line). One stack opens at most `maxCachedMaps` maps. Control
+  characters are removed from stack text, and line or column numbers that are not safe integers are ignored.
 - Stack columns count from 1 and source map columns from 0, but the stack column was used as it was, so lookups
   were one column off. The "Chrome parse fix" workaround is gone because the parser reads the line and column itself.
 - Content-hashed names from Bun (`[name]-[hash].js`, `chunk-<hash>.js`), webpack, Vite and esbuild, and URLs with

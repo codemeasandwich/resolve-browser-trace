@@ -44,7 +44,18 @@ echo "Step 1: tests with the 100% coverage threshold"
 npm test
 
 LOCAL_VERSION=$(node -p "require('./package.json').version")
-NPM_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "0.0.0")
+if [[ ! "$LOCAL_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: package.json version '$LOCAL_VERSION' must be plain x.y.z (no pre-release suffix)." >&2
+  exit 1
+fi
+if NPM_VIEW=$(npm view "$PACKAGE_NAME" version 2>&1); then
+  NPM_VERSION="$NPM_VIEW"
+elif grep -q E404 <<< "$NPM_VIEW"; then
+  NPM_VERSION="0.0.0"   # never published
+else
+  echo "Error: could not ask npm for the published version: $NPM_VIEW" >&2
+  exit 1
+fi
 echo "Local version: $LOCAL_VERSION, npm version: $NPM_VERSION"
 
 PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -71,8 +82,8 @@ if [[ $(compare_versions "$NEW_VERSION" "$NPM_VERSION") -ne 1 ]]; then
   exit 1
 fi
 TAG="v$NEW_VERSION"
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "Error: tag $TAG already exists." >&2
+if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
+  echo "Error: tag $TAG already exists (locally or on origin)." >&2
   exit 1
 fi
 
@@ -101,7 +112,7 @@ add_section "Other changes" "refactor|docs|build|ci|style|test"
 [[ -z "$NOTES" ]] && NOTES="No notable changes in this release."
 
 echo "Step 4: creating GitHub release $TAG"
-printf '%s\n' "$NOTES" | gh release create "$TAG" --title "$TAG" --notes-file -
+printf '%s\n' "$NOTES" | gh release create "$TAG" --target "$(git rev-parse HEAD)" --title "$TAG" --notes-file -
 
 REPO=$(git remote get-url origin | sed -E 's#^(git@github.com:|https://github.com/)##; s#\.git$##')
 echo "Release $TAG created. The workflow publishes it to npm with provenance:"

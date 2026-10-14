@@ -55,8 +55,10 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Check the release tag matches package.json
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          test "v$(node -p "require('./package.json').version")" = "${{ github.event.release.tag_name }}"
+          test "v$(node -p "require('./package.json').version")" = "$TAG"
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public

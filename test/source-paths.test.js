@@ -112,6 +112,10 @@ describe('whatever the map says, no result is an absolute or climbing path', () 
     ['a/../../../b/c.ts'],
     ['/Users/ci/../../../root/.ssh/id_rsa'],
     ['src\\a\\..\\..\\..\\b.ts'],
+    ['vm:///Users/ci/x.ts'],
+    ['c:foo.ts'],
+    ['./C:/Users/x.ts'],
+    ['file:/Users/ci/secret/x.ts'],
   ])('source %j', async (hostile) => {
     const out = await sourcesOf(Array(5).fill(hostile))
     expect(out.length).toBeLessThanOrEqual(3)

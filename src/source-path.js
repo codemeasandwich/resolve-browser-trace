@@ -8,13 +8,16 @@
 //   /Users/ci/build/shop/src/a.ts    -> src/a.ts               (with root '/Users/ci/build/shop'; see below)
 //   file:///Users/ci/build/shop/x.ts -> ...
 //
-// Anything inside node_modules is cut to node_modules/<package>/... Paths that were absolute or climbed out of
-// the output folder ("environment paths") are made relative to `root` when they sit under it. Otherwise they are
-// cut down to src/... (from the last "src" folder), or their last two segments. Nothing that comes back starts
-// with "/", "..", or a drive letter.
+// A Windows drive ("C:\...", "c:foo") or a scheme other than webpack: marks an absolute path. Anything inside
+// node_modules is cut to node_modules/<package>/... Paths that were absolute or climbed out of the output folder
+// ("environment paths") are made relative to `root` when they sit under it. Otherwise they are cut down to src/...
+// (from the last "src" folder), or their last two segments. Nothing that comes back starts with "/", "..", or a
+// drive letter.
 
 const SCHEME = /^([a-z][a-z0-9+.-]*):\/\/[^/]*\/?/i
-const DRIVE_PREFIX = /^[a-z]:(?=\/|$)/i
+const DRIVE_PREFIX = /^[a-z]:/i
+// Schemes whose paths are project-relative; for any other scheme (file:, vm:, ...) the path is the machine's.
+const PROJECT_SCHEMES = new Set(['webpack', 'webpack-internal', 'turbopack', 'ng'])
 
 // "a/./b/../c" -> ['a', 'c']; `climbed` is true when a ".." had nothing left to remove (the path left its base folder).
 function splitPath(path) {
@@ -53,7 +56,7 @@ function normalizeSource(raw, root) {
   let environment = false
   const scheme = SCHEME.exec(path)
   if (scheme) {
-    environment = scheme[1].toLowerCase() === 'file'
+    environment = !PROJECT_SCHEMES.has(scheme[1].toLowerCase())
     path = path.slice(scheme[0].length)
   }
   path = path.replace(/[?#].*$/, '')
@@ -62,6 +65,10 @@ function normalizeSource(raw, root) {
   }
   path = path.replace(DRIVE_PREFIX, '').replace(/^\/@fs\//, '/') // "/@fs/" is how Vite names files outside its root
   const { segments, climbed } = splitPath(path)
+  if (/^[a-z]:$/i.test(segments[0] || '')) {
+    segments.shift() // "./C:/Users/x.ts"
+    environment = true
+  }
   if (segments.length === 0) {
     return null
   }

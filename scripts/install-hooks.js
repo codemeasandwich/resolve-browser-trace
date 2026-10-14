@@ -18,15 +18,22 @@ function hooksTarget() {
   }
 }
 
+// every file copied from .hooks is a script git must be allowed to run
+function makeExecutable(from, to) {
+  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+    const copied = path.join(to, entry.name)
+    if (entry.isDirectory()) {
+      makeExecutable(path.join(from, entry.name), copied)
+    } else {
+      fs.chmodSync(copied, 0o755)
+    }
+  }
+}
+
 const target = hooksTarget()
 if (target && fs.existsSync(source)) {
   fs.mkdirSync(target, { recursive: true })
   fs.cpSync(source, target, { recursive: true })
-  for (const file of fs.readdirSync(target, { recursive: true })) {
-    const full = path.join(target, file)
-    if (fs.statSync(full).isFile() && !full.endsWith('.js')) {
-      fs.chmodSync(full, 0o755)
-    }
-  }
+  makeExecutable(source, target)
   console.log(`resolve-browser-trace: git hooks installed in ${target}`)
 }

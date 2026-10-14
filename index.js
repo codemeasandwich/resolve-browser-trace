@@ -29,8 +29,8 @@ function normalizeOptions(input) {
   if (mapsDir === undefined && maps === undefined && loadMap === undefined) {
     throw new TypeError('resolve-browser-trace: set one of mapsDir, maps or loadMap')
   }
-  if (mapsDir !== undefined && typeof mapsDir !== 'string') {
-    throw new TypeError('resolve-browser-trace: mapsDir must be a string')
+  if (mapsDir !== undefined && (typeof mapsDir !== 'string' || mapsDir === '')) {
+    throw new TypeError('resolve-browser-trace: mapsDir must be a folder path')
   }
   if (maps !== undefined && (typeof maps !== 'object' || maps === null)) {
     throw new TypeError('resolve-browser-trace: maps must be an object of { "<bundle file name>": map }')
@@ -53,19 +53,29 @@ function normalizeOptions(input) {
   }
 }
 
+const MAX_NAME_LENGTH = 200
+
 // What the browser calls a function is not always a name:
 //   V8 "Object.emptyCheckout", "t.quote [as q]", "async fn", "new Foo"    -> emptyCheckout, quote, fn, Foo
 //   Firefox "a/<" (anonymous inside a), "a/b<", "async*fn"                -> null, b, fn
 //   "<anonymous>", "<unknown>", ""                                        -> null
+// Plain string scanning, no backtracking regular expressions: the name is client text.
 function cleanName(raw) {
   if (!raw) {
     return null
   }
-  const name = raw
-    .replace(/ \[as [^\]]*\]$/, '')
-    .replace(/^(?:(?:async|new) )+/, '')
-    .replace(/^.*[./*]/, '')
-    .replace(/<+$/, '')
+  let name = raw.length > MAX_NAME_LENGTH ? raw.slice(0, MAX_NAME_LENGTH) : raw
+  const alias = name.endsWith(']') ? name.lastIndexOf(' [as ') : -1
+  if (alias !== -1) {
+    name = name.slice(0, alias)
+  }
+  name = name.replace(/^(?:(?:async|new) )+/, '')
+  name = name.slice(Math.max(name.lastIndexOf('.'), name.lastIndexOf('/'), name.lastIndexOf('*')) + 1)
+  let end = name.length
+  while (end > 0 && name[end - 1] === '<') {
+    end--
+  }
+  name = name.slice(0, end)
   return name === '' || name === '<anonymous>' || name === '<unknown>' ? null : name
 }
 
@@ -104,7 +114,7 @@ function createResolver(options) {
   const store = createMapStore(config)
 
   function mapFrame(raw, map) {
-    if (!map || raw.line === null || raw.column === null || raw.column < 1) {
+    if (!map || raw.line === null || raw.line < 1 || raw.column === null || raw.column < 1) {
       return { frame: unmappedFrame(raw), callee: null }
     }
     // stack columns count from 1, source map columns from 0
@@ -124,7 +134,8 @@ function createResolver(options) {
     }
     if (config.includeSource) {
       const content = sourceContentFor(map, position.source)
-      frame.sourceLine = content === null ? null : lineOf(content, position.line)
+      // sourcesContent may be shorter than sources, or hold anything
+      frame.sourceLine = typeof content === 'string' ? lineOf(content, position.line) : null
     }
     return { frame, callee: position.name }
   }
@@ -141,9 +152,9 @@ function createResolver(options) {
     }
     const files = raw.map((frame) => bundleFileName(frame.file))
     const maps = new Map()
-    await Promise.all(
-      [...new Set(files)].filter(Boolean).map(async (name) => maps.set(name, await store.get(name)))
-    )
+    // one stack may name any number of bundles, but only as many maps as the cache holds are opened for it
+    const names = [...new Set(files)].filter(Boolean).slice(0, config.maxCachedMaps)
+    await Promise.all(names.map(async (name) => maps.set(name, await store.get(name))))
     const mapped = raw.map((frame, i) => mapFrame(frame, maps.get(files[i])))
     const frames = mapped.map(({ frame }) => frame)
     // A frame's source-map name is the identifier at its call position, i.e. the function the *caller* invoked.

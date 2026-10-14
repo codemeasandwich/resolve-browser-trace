@@ -16,14 +16,17 @@ declare namespace createResolver {
   interface Options {
     /**
      * Folder holding `<bundle file name>.map` files, e.g. `app-1a2b3c.js.map` for `https://host/app-1a2b3c.js`.
-     * The folder is read on demand, so maps copied there after startup are found.
+     * A map is read the first time its bundle shows up, so maps copied there after startup are found.
+     * Once loaded it stays cached until evicted (see `maxCachedMaps`); use new file names (content hashes do) to replace it.
      */
     mapsDir?: string
-    /** Maps in memory, keyed by bundle file name: `{ 'app-1a2b3c.js': mapJsonOrObject }`. Read on every lookup. */
+    /** Maps in memory, keyed by bundle file name: `{ 'app-1a2b3c.js': mapJsonOrObject }`. Parsed when first needed, then cached. */
     maps?: Record<string, SourceMapInput>
     /**
      * Called with a bundle file name that looks like a plain file name; return its map, or null/undefined when you
      * have none. The name comes from the client: treat it as untrusted. Consulted after `maps`, before `mapsDir`.
+     * Misses are not cached and there is no timeout: one stack can call this up to `maxCachedMaps` times, so cache
+     * misses and bound the time yourself if it talks to a database or the network.
      */
     loadMap?: (fileName: string) => SourceMapInput | null | undefined | Promise<SourceMapInput | null | undefined>
     /**
@@ -34,19 +37,19 @@ declare namespace createResolver {
     /** Add `sourceLine` (the original line of code, from the map's `sourcesContent`) to mapped frames. Default false. */
     includeSource?: boolean
     /** Called when a map exists but cannot be loaded or parsed. A missing map is not an error. */
-    onError?: (error: unknown, info: { file: string }) => void
+    onError?: (error: unknown, info: { file: string }) => void | Promise<void>
     /** Longest stack text read, in characters; the rest is ignored. Default 65536. */
     maxStackLength?: number
     /** Most frames returned for one stack. Default 100. */
     maxFrames?: number
-    /** Parsed maps kept in memory (least recently used leave first). Default 16. */
+    /** Parsed maps kept in memory (least recently used leave first), and the most maps one stack can open. Default 16. */
     maxCachedMaps?: number
   }
 
   interface Frame {
     /** Original file (`src/lib/cart.ts`) when mapped; the script URL without query or fragment when not. */
     source: string | null
-    /** 1-based line, or null when the frame has none (`<anonymous>`, `[native code]`). */
+    /** 1-based line, or null when the frame has none (`<anonymous>`, `[native code]`) or it is not a usable number. */
     line: number | null
     /** 1-based column, or null. */
     column: number | null
