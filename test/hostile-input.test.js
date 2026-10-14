@@ -279,3 +279,57 @@ describe('maps that load but are hostile inside', () => {
     expect(frames[0].source).toBe('https://h/a.js')
   })
 })
+
+describe('maps whose names are huge, disguised or bombs', () => {
+  const stack100 = Array.from({ length: 100 }, () => '    at f (https://h/app.js:1:1)').join('\n')
+  const sourceMap = (source, extra) => ({ version: 3, sources: [source], names: [], mappings: 'AAAA', ...extra })
+  const first = async (source) => (await createResolver({ maps: { 'app.js': sourceMap(source) } })('    at f (https://h/app.js:1:1)'))[0]
+
+  test('a 6 MB source name on a 100-frame stack resolves, with a short source', async () => {
+    const frames = await createResolver({ maps: { 'app.js': sourceMap('a'.repeat(6e6)) } })(stack100)
+    expect(frames).toHaveLength(100)
+    expect(frames[0].source.length).toBeLessThanOrEqual(1000)
+    expect(frames.stack.length).toBeLessThan(200000)
+  })
+
+  test('a source of 80000 "?" and a newline does not stall the event loop', async () => {
+    const started = Date.now()
+    await first(`${'?'.repeat(80000)}\n`)
+    expect(Date.now() - started).toBeLessThan(500)
+  })
+
+  test.each([
+    ['a zero-width space before a root', '\u200b/Users/ci/build/shop/src/a.ts', 'src/a.ts'],
+    ['zero-width spaces inside dot-dot', '.\u200b./.\u200b./etc/passwd', 'etc/passwd'],
+    ['a control character before a root', '\u0001/etc/passwd', 'etc/passwd'],
+    ['a zero-width space inside a drive', 'C\u200b:/Users/x/y.ts', 'x/y.ts'],
+    ['a soft hyphen and tag characters', '/Users/ci/s\u00adrc/a.ts\u{e0041}', 'src/a.ts'],
+    ['a newline after a query mark', 'a?x\n/Users/ci/y', 'a'],
+  ])('%s cannot smuggle an absolute path past the cleaning', async (_, source, expected) => {
+    const frame = await first(source)
+    expect(frame.source).toBe(expected)
+    expect(frame.source).not.toMatch(/^([/\\]|[A-Za-z]:|\.\.)/)
+  })
+
+  test.each([['only invisible characters', '\u0001\u200b'], ['dot-dot', '\u200b..']])('a source of %s leaves the frame unmapped, never an empty source', async (_, source) => {
+    expect((await first(source)).mapped).toBe(false)
+  })
+
+  test('a map over maxMapBytes, or with over two million generated lines, is refused and reported', async () => {
+    const reported = []
+    const onError = (error) => reported.push(error.message)
+    const real = fs.readFileSync(`${mapsDir('esbuild')}/${esbuildFile}.map`, 'utf8')
+    const small = createResolver({ maps: { [esbuildFile]: real }, maxMapBytes: 1000, onError })
+    expect((await small(realStack))[0].mapped).toBe(false)
+    const lines = createResolver({ maps: { 'app.js': sourceMap('a.ts', { mappings: `${';'.repeat(2_000_001)}AAAA` }) }, onError })
+    expect((await lines('    at f (https://h/app.js:1:1)'))[0].mapped).toBe(false)
+    const long = createResolver({ maps: { 'app.js': sourceMap('a.ts', { mappings: 'A'.repeat(2000) }) }, maxMapBytes: 1000, onError })
+    expect((await long('    at f (https://h/app.js:1:1)'))[0].mapped).toBe(false)
+    expect(reported).toEqual([expect.stringMatching(/maxMapBytes/), expect.stringMatching(/too many/), expect.stringMatching(/too many/)])
+  })
+
+  test('a map just under the limits is used', async () => {
+    const ok = createResolver({ maps: { 'app.js': sourceMap('a.ts', { mappings: `${';'.repeat(1000)}AAAA` }) } })
+    expect((await ok('    at f (https://h/app.js:1001:1)'))[0]).toMatchObject({ mapped: true, source: 'a.ts' })
+  })
+})

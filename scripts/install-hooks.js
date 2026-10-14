@@ -44,7 +44,7 @@ if (target && sharedHooksPath()) {
   console.log('resolve-browser-trace: core.hooksPath is set, git hooks not installed (copy .hooks/* yourself if wanted)')
 } else if (target && fs.existsSync(source)) {
   fs.mkdirSync(target, { recursive: true })
-  fs.cpSync(source, target, { recursive: true })
+  fs.cpSync(source, target, { recursive: true, force: false, errorOnExist: false }) // hooks already there are kept
   makeExecutable(source, target)
   console.log(`resolve-browser-trace: git hooks installed in ${target}`)
 }

@@ -28,15 +28,24 @@ function bundleFileName(file) {
   return SAFE_FILE_NAME.test(name) ? name : null
 }
 
-function toTraceMap(raw) {
+// Decoding allocates an array per generated line, so a map of nothing but ";" is a memory bomb at any byte size.
+const MAX_GENERATED_LINES = 2_000_000
+
+function toTraceMap(raw, maxMapBytes) {
   if (raw instanceof Uint8Array) {
     raw = Buffer.from(raw).toString('utf8')
   }
-  if (typeof raw === 'string' && raw.charCodeAt(0) === 0xfeff) {
-    raw = raw.slice(1) // a byte order mark in front of the JSON
+  if (typeof raw === 'string' && raw.length > maxMapBytes) {
+    throw new RangeError(`source map is larger than maxMapBytes (${maxMapBytes})`)
   }
-  if (typeof raw !== 'string' && (typeof raw !== 'object' || raw === null)) {
+  if (typeof raw === 'string') {
+    raw = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw) // a byte order mark may precede the JSON
+  }
+  if (typeof raw !== 'object' || raw === null) {
     throw new TypeError('a source map must be a JSON string, a Buffer or an object')
+  }
+  if (typeof raw.mappings === 'string' && (raw.mappings.length > maxMapBytes || raw.mappings.split(';', MAX_GENERATED_LINES + 1).length > MAX_GENERATED_LINES)) {
+    throw new RangeError('source map has too many bytes or lines')
   }
   const map = new TraceMap(raw)
   decodedMappings(map) // decode now, while loading, so no lookup pays for it and a map that cannot be decoded fails here
@@ -53,10 +62,10 @@ function readMapFile(file) {
 }
 
 /**
- * @param {{mapsDir?: string, maps?: object, loadMap?: Function, maxCachedMaps: number, onError?: Function}} options
+ * @param {{mapsDir?: string, maps?: object, loadMap?: Function, maxCachedMaps: number, maxMapBytes: number, onError?: Function}} options
  */
 function createMapStore(options) {
-  const { mapsDir, maps, loadMap, maxCachedMaps, onError } = options
+  const { mapsDir, maps, loadMap, maxCachedMaps, maxMapBytes, onError } = options
   const cache = new Map()
   const loading = new Map()
 
@@ -79,7 +88,7 @@ function createMapStore(options) {
       if (raw == null) {
         return null
       }
-      const map = toTraceMap(raw)
+      const map = toTraceMap(raw, maxMapBytes)
       cache.set(name, map)
       if (cache.size > maxCachedMaps) {
         cache.delete(cache.keys().next().value)

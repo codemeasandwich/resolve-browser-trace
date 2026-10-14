@@ -102,6 +102,18 @@ describe('the git hooks', () => {
     expect(execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: bare, encoding: 'utf8' })).toBe('')
   })
 
+  test('a hook the developer already has is kept', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-own-'))
+    execFileSync('git', ['init', '-q'], { cwd: repo })
+    fs.writeFileSync(path.join(repo, '.git', 'hooks', 'pre-commit'), '# my own hook\n')
+    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
+    fs.mkdirSync(path.join(repo, 'scripts'))
+    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
+    execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo })
+    expect(fs.readFileSync(path.join(repo, '.git', 'hooks', 'pre-commit'), 'utf8')).toBe('# my own hook\n')
+    expect(fs.existsSync(path.join(repo, '.git', 'hooks', 'commit-msg'))).toBe(true)
+  })
+
   test('when core.hooksPath is set (hooks shared by many repositories) nothing is written there', () => {
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-shared-'))
     const shared = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-shared-hooks-'))

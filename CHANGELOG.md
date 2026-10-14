@@ -16,7 +16,7 @@ or fixed, and the second list is what can change your results.
 
 - `createResolver(options)` (also exported as `setup`) with `mapsDir`, `maps` (maps in memory, as JSON text, a Buffer
   or an object, so a `bun build --compile` binary can embed them), `loadMap(fileName)`, `root`, `includeSource`,
-  `onError`, `maxStackLength`, `maxFrames`, `maxCachedMaps` and `maxMapsPerStack`. `createResolver('<folder>')` still works.
+  `onError`, `maxStackLength`, `maxFrames`, `maxCachedMaps`, `maxMapsPerStack` and `maxMapBytes`. `createResolver('<folder>')` still works.
 - `mapped` on every frame; `frames.stack`, a readable rebuilt stack (not enumerable, so not in the JSON);
   `formatStack(frames)`; optional `sourceLine` (the original line of code from `sourcesContent`).
 - Stack parsers for Chrome / Edge / Node / Bun (V8), Firefox (SpiderMonkey) and Safari (JavaScriptCore), including

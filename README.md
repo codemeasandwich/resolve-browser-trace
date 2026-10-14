@@ -68,6 +68,7 @@ call 0.x versions used (`setup` is kept as another name for `createResolver`).
 | `maxStackLength` | `65536` | Characters of stack text read; the rest is ignored. |
 | `maxFrames` | `100` | Frames returned for one stack. |
 | `maxCachedMaps` | `16` | Parsed maps kept in memory, least recently used out first. |
+| `maxMapBytes` | `67108864` | Largest map accepted, in characters of JSON. Bigger maps, and maps with over two million generated lines, are reported to `onError` and not used. |
 | `maxMapsPerStack` | `4` | Most maps opened for one stack; frames of further bundles stay unmapped. Parsing a map is synchronous work, so this bounds what one request can cost. |
 
 At least one of `mapsDir`, `maps` and `loadMap` is required (otherwise `createResolver` throws a `TypeError`).

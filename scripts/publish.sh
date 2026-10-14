@@ -3,7 +3,9 @@
 #
 # Creates a GitHub release; the "Publish to npm with Provenance" workflow then publishes it to npm.
 # Modelled on api-ape's scripts/publish.sh (same steps, same commit-type driven version bump), but it never amends
-# or force-pushes commits and never deletes tags or releases: if something fails, fix it and run it again.
+# or force-pushes commits and never deletes tags or releases. If it stops before the GitHub release exists, fix the
+# cause and run it again. If the release exists but the publish workflow failed, fix the cause and re-run that
+# workflow run in GitHub Actions (running this script again stops: the tag exists).
 #
 #   npm run release          bump from the commit messages since the last tag (feat! major, feat minor, else patch)
 #   npm run release 1.2.0    release exactly that version

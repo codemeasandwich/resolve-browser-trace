@@ -14,6 +14,11 @@
 // (from the last "src" folder), or their last two segments. Nothing that comes back starts with "/", "..", or a
 // drive letter.
 
+const { sanitize } = require('./sanitize')
+
+// A source name longer than this is cut to its tail: nothing real is longer, and it bounds the work and the output.
+const MAX_SOURCE_LENGTH = 1000
+
 const SCHEME = /^([a-z][a-z0-9+.-]*):\/\/[^/]*\/?/i
 const DRIVE_PREFIX = /^[a-z]:/i
 const DRIVE_SEGMENT = /^[a-z]:$/i
@@ -56,14 +61,15 @@ function rootSegments(root) {
  * @returns {string|null}
  */
 function normalizeSource(raw, root) {
-  let path = raw.replace(/\\/g, '/')
+  let path = sanitize(raw.length > MAX_SOURCE_LENGTH ? raw.slice(-MAX_SOURCE_LENGTH) : raw).replace(/\\/g, '/')
   let environment = false
   const scheme = SCHEME.exec(path)
   if (scheme) {
     environment = !PROJECT_SCHEMES.has(scheme[1].toLowerCase())
     path = path.slice(scheme[0].length)
   }
-  path = path.replace(/[?#].*$/, '')
+  const query = path.search(/[?#]/)
+  path = query === -1 ? path : path.slice(0, query)
   if (DRIVE_PREFIX.test(path) || path.startsWith('/')) {
     environment = true
   }

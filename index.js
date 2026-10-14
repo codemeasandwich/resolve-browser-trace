@@ -7,7 +7,7 @@ const { parseStack } = require('./src/parse-stack')
 const { sanitize } = require('./src/sanitize')
 const { normalizeSource, rootSegments } = require('./src/source-path')
 
-const DEFAULTS = { maxStackLength: 65536, maxFrames: 100, maxCachedMaps: 16, maxMapsPerStack: 4 }
+const DEFAULTS = { maxStackLength: 65536, maxFrames: 100, maxCachedMaps: 16, maxMapsPerStack: 4, maxMapBytes: 64 * 1024 * 1024 }
 const MAX_SOURCE_LINE = 300
 
 function positiveInteger(options, key) {
@@ -52,6 +52,7 @@ function normalizeOptions(input) {
     maxFrames: positiveInteger(options, 'maxFrames'),
     maxCachedMaps: positiveInteger(options, 'maxCachedMaps'),
     maxMapsPerStack: positiveInteger(options, 'maxMapsPerStack'),
+    maxMapBytes: positiveInteger(options, 'maxMapBytes'),
   }
 }
 
@@ -127,7 +128,7 @@ function createResolver(options) {
       return { frame: unmappedFrame(raw), callee: null }
     }
     const frame = {
-      source: sanitize(source),
+      source,
       line: position.line,
       column: position.column + 1,
       name: cleanName(raw.name),
