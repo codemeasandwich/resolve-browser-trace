@@ -1,0 +1,64 @@
+name: Publish to npm with Provenance
+
+# Runs when a GitHub release is published (npm run release creates one). Needs one of:
+#   - an NPM_TOKEN repository secret (an npm automation token), used below; or
+#   - npm Trusted Publishing configured for this repository and workflow on npmjs.com, in which case the token
+#     can be removed (provenance uses the same id-token permission).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:   # test the pipeline without publishing
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Tests (100% coverage threshold)
+        run: npm test
+
+  publish:
+    needs: test
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for npm provenance
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Check the release tag matches package.json
+        run: |
+          test "v$(node -p "require('./package.json').version")" = "${{ github.event.release.tag_name }}"
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# .hooks/pre-commit - runs every script in .hooks/pre-commit.d/ (same layout as api-ape and scribbles).
+# Like them, it only checks commits made on the main line, so work-in-progress branches stay quick.
+
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
+    echo "Skipping pre-commit checks on branch: $CURRENT_BRANCH (checks only run on main/master)"
+    exit 0
+fi
+
+CHECKS_DIR="$(cd "$(dirname "$0")" && pwd)/pre-commit.d"
+ERROR=0
+
+echo "Running pre-commit checks..."
+for script in "$CHECKS_DIR"/*.sh; do
+    [ -f "$script" ] || continue
+    if ! bash "$script"; then
+        ERROR=1
+    fi
+done
+
+if [ $ERROR -eq 1 ]; then
+    echo ""
+    echo "Commit blocked: one or more checks failed"
+    exit 1
+fi
+
+echo "All pre-commit checks passed"
+exit 0
