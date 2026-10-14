@@ -1,0 +1,40 @@
+{
+  "bun": {
+    "bundles": [
+      "app-pf2qqq1g.js"
+    ],
+    "maps": [
+      "app-pf2qqq1g.js.map"
+    ]
+  },
+  "bun-split": {
+    "bundles": [
+      "app-nfjt25qb.js",
+      "app-w0vbqq0t.js",
+      "lazy-5ynm9r3f.js"
+    ],
+    "maps": [
+      "app-nfjt25qb.js.map",
+      "app-w0vbqq0t.js.map",
+      "lazy-5ynm9r3f.js.map"
+    ]
+  },
+  "esbuild": {
+    "bundles": [
+      "app-CQH66RKJ.js"
+    ],
+    "maps": [
+      "app-CQH66RKJ.js.map"
+    ]
+  },
+  "esbuild-split": {
+    "bundles": [
+      "app-PPBM5C4H.js",
+      "chunk-QMLZOCCF.js"
+    ],
+    "maps": [
+      "app-PPBM5C4H.js.map",
+      "chunk-QMLZOCCF.js.map"
+    ]
+  }
+}

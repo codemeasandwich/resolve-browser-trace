@@ -1,0 +1,39 @@
+{
+  "browser": "firefox",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:158.0) Gecko/20100101 Firefox/158.0",
+  "origin": "http://localhost:43817",
+  "variants": {
+    "bun": {
+      "emptyCheckout": "w@http://localhost:43817/bun/app-pf2qqq1g.js:1:299\nt@http://localhost:43817/bun/app-pf2qqq1g.js:1:344\nemptyCheckout@http://localhost:43817/bun/app-pf2qqq1g.js:1:877\nwindow.__run@http://localhost:43817/page?variant=bun:6:39\n",
+      "quoteNegative": "quote@http://localhost:43817/bun/app-pf2qqq1g.js:1:464\nquoteNegative@http://localhost:43817/bun/app-pf2qqq1g.js:1:920\nwindow.__run@http://localhost:43817/page?variant=bun:6:39\n",
+      "bigDiscount": "i@http://localhost:43817/bun/app-pf2qqq1g.js:1:575\nbigDiscount@http://localhost:43817/bun/app-pf2qqq1g.js:1:963\nwindow.__run@http://localhost:43817/page?variant=bun:6:39\n",
+      "blankRow": "g@http://localhost:43817/bun/app-pf2qqq1g.js:1:663\na/<@http://localhost:43817/bun/app-pf2qqq1g.js:1:771\na@http://localhost:43817/bun/app-pf2qqq1g.js:1:761\nblankRow@http://localhost:43817/bun/app-pf2qqq1g.js:1:993\nwindow.__run@http://localhost:43817/page?variant=bun:6:39\n",
+      "rejectLater": "w@http://localhost:43817/bun/app-pf2qqq1g.js:1:299\nt@http://localhost:43817/bun/app-pf2qqq1g.js:1:344\nrejectLater@http://localhost:43817/bun/app-pf2qqq1g.js:1:1061\n",
+      "lazyFailure": "b@http://localhost:43817/bun/app-pf2qqq1g.js:1:226\nlazyFailure@http://localhost:43817/bun/app-pf2qqq1g.js:1:1128\n"
+    },
+    "bun-split": {
+      "emptyCheckout": "a@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:75\nt@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:120\nemptyCheckout@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:653\nwindow.__run@http://localhost:43817/page?variant=bun-split:6:39\n",
+      "quoteNegative": "quote@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:240\nquoteNegative@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:696\nwindow.__run@http://localhost:43817/page?variant=bun-split:6:39\n",
+      "bigDiscount": "i@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:351\nbigDiscount@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:739\nwindow.__run@http://localhost:43817/page?variant=bun-split:6:39\n",
+      "blankRow": "s@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:439\nu/<@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:547\nu@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:537\nblankRow@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:769\nwindow.__run@http://localhost:43817/page?variant=bun-split:6:39\n",
+      "rejectLater": "a@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:75\nt@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:120\nrejectLater@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:837\n",
+      "lazyFailure": "e@http://localhost:43817/bun-split/lazy-5ynm9r3f.js:1:47\nlazyFailure@http://localhost:43817/bun-split/app-w0vbqq0t.js:1:901\n"
+    },
+    "esbuild": {
+      "emptyCheckout": "w@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:301\no@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:350\nemptyCheckout@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:894\nwindow.__run@http://localhost:43817/page?variant=esbuild:6:39\n",
+      "quoteNegative": "quote@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:474\nquoteNegative@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:937\nwindow.__run@http://localhost:43817/page?variant=esbuild:6:39\n",
+      "bigDiscount": "i@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:586\nbigDiscount@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:980\nwindow.__run@http://localhost:43817/page?variant=esbuild:6:39\n",
+      "blankRow": "p@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:678\na/<@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:788\na@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:780\nblankRow@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:1010\nwindow.__run@http://localhost:43817/page?variant=esbuild:6:39\n",
+      "rejectLater": "w@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:301\no@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:350\nrejectLater@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:1078\n",
+      "lazyFailure": "g@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:196\nlazyFailure@http://localhost:43817/esbuild/app-CQH66RKJ.js:1:1149\n"
+    },
+    "esbuild-split": {
+      "emptyCheckout": "a@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:37\no@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:86\nemptyCheckout@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:630\nwindow.__run@http://localhost:43817/page?variant=esbuild-split:6:39\n",
+      "quoteNegative": "quote@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:210\nquoteNegative@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:673\nwindow.__run@http://localhost:43817/page?variant=esbuild-split:6:39\n",
+      "bigDiscount": "i@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:322\nbigDiscount@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:716\nwindow.__run@http://localhost:43817/page?variant=esbuild-split:6:39\n",
+      "blankRow": "s@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:414\nu/<@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:524\nu@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:516\nblankRow@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:746\nwindow.__run@http://localhost:43817/page?variant=esbuild-split:6:39\n",
+      "rejectLater": "a@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:37\no@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:86\nrejectLater@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:814\n",
+      "lazyFailure": "e@http://localhost:43817/esbuild-split/chunk-QMLZOCCF.js:1:21\nlazyFailure@http://localhost:43817/esbuild-split/app-PPBM5C4H.js:1:879\n"
+    }
+  }
+}

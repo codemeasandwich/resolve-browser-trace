@@ -1,0 +1,23 @@
+{
+  "browser": "node",
+  "userAgent": "node v24.13.0",
+  "origin": "https://shop.example.com/assets",
+  "variants": {
+    "bun": {
+      "emptyCheckout": "Error: cart is empty\n    at w (https://shop.example.com/assets/app-pf2qqq1g.js:1:299)\n    at t (https://shop.example.com/assets/app-pf2qqq1g.js:1:343)\n    at Object.emptyCheckout (https://shop.example.com/assets/app-pf2qqq1g.js:1:877)",
+      "quoteNegative": "RangeError: negative quantity for mug-blue in EUR\n    at o.quote (https://shop.example.com/assets/app-pf2qqq1g.js:1:464)\n    at Object.quoteNegative (https://shop.example.com/assets/app-pf2qqq1g.js:1:920)",
+      "bigDiscount": "RangeError: discount above 100%\n    at i (https://shop.example.com/assets/app-pf2qqq1g.js:1:575)\n    at Object.bigDiscount (https://shop.example.com/assets/app-pf2qqq1g.js:1:963)",
+      "blankRow": "Error: row label is blank\n    at g (https://shop.example.com/assets/app-pf2qqq1g.js:1:663)\n    at https://shop.example.com/assets/app-pf2qqq1g.js:1:770\n    at Array.map (<anonymous>)\n    at a (https://shop.example.com/assets/app-pf2qqq1g.js:1:761)\n    at Object.blankRow (https://shop.example.com/assets/app-pf2qqq1g.js:1:993)",
+      "rejectLater": "Error: cart is empty\n    at w (https://shop.example.com/assets/app-pf2qqq1g.js:1:299)\n    at t (https://shop.example.com/assets/app-pf2qqq1g.js:1:343)",
+      "lazyFailure": "TypeError: lazy chunk failed: network\n    at Object.b (https://shop.example.com/assets/app-pf2qqq1g.js:1:226)\n    at Object.lazyFailure (https://shop.example.com/assets/app-pf2qqq1g.js:1:1128)"
+    },
+    "esbuild": {
+      "emptyCheckout": "Error: cart is empty\n    at w (https://shop.example.com/assets/app-CQH66RKJ.js:1:301)\n    at o (https://shop.example.com/assets/app-CQH66RKJ.js:1:349)\n    at Object.emptyCheckout (https://shop.example.com/assets/app-CQH66RKJ.js:1:894)",
+      "quoteNegative": "RangeError: negative quantity for mug-blue in EUR\n    at t.quote (https://shop.example.com/assets/app-CQH66RKJ.js:1:474)\n    at Object.quoteNegative (https://shop.example.com/assets/app-CQH66RKJ.js:1:937)",
+      "bigDiscount": "RangeError: discount above 100%\n    at i (https://shop.example.com/assets/app-CQH66RKJ.js:1:586)\n    at Object.bigDiscount (https://shop.example.com/assets/app-CQH66RKJ.js:1:980)",
+      "blankRow": "Error: row label is blank\n    at p (https://shop.example.com/assets/app-CQH66RKJ.js:1:678)\n    at https://shop.example.com/assets/app-CQH66RKJ.js:1:787\n    at Array.map (<anonymous>)\n    at a (https://shop.example.com/assets/app-CQH66RKJ.js:1:780)\n    at Object.blankRow (https://shop.example.com/assets/app-CQH66RKJ.js:1:1010)",
+      "rejectLater": "Error: cart is empty\n    at w (https://shop.example.com/assets/app-CQH66RKJ.js:1:301)\n    at o (https://shop.example.com/assets/app-CQH66RKJ.js:1:349)",
+      "lazyFailure": "TypeError: lazy chunk failed: network\n    at Object.g (https://shop.example.com/assets/app-CQH66RKJ.js:1:196)\n    at Object.lazyFailure (https://shop.example.com/assets/app-CQH66RKJ.js:1:1149)"
+    }
+  }
+}

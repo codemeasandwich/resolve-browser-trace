@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "sources": ["../../src/lib/lazy.ts"],
+  "sourcesContent": [
+    "export function lazyFail(reason: string): never {\n  throw new TypeError(`lazy chunk failed: ${reason}`)\n}\n"
+  ],
+  "mappings": "0BAAO,SAAS,CAAQ,CAAC,EAAuB,CAC9C,MAAU,UAAU,sBAAsB,GAAQ",
+  "debugId": "709F4C57413B652D64756E2164756E21",
+  "names": []
+}
