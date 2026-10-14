@@ -4,9 +4,10 @@ const { originalPositionFor, sourceContentFor } = require('@jridgewell/trace-map
 const { formatStack } = require('./src/format')
 const { bundleFileName, createMapStore } = require('./src/map-store')
 const { parseStack } = require('./src/parse-stack')
+const { sanitize } = require('./src/sanitize')
 const { normalizeSource, rootSegments } = require('./src/source-path')
 
-const DEFAULTS = { maxStackLength: 65536, maxFrames: 100, maxCachedMaps: 16 }
+const DEFAULTS = { maxStackLength: 65536, maxFrames: 100, maxCachedMaps: 16, maxMapsPerStack: 4 }
 const MAX_SOURCE_LINE = 300
 
 function positiveInteger(options, key) {
@@ -50,6 +51,7 @@ function normalizeOptions(input) {
     maxStackLength: positiveInteger(options, 'maxStackLength'),
     maxFrames: positiveInteger(options, 'maxFrames'),
     maxCachedMaps: positiveInteger(options, 'maxCachedMaps'),
+    maxMapsPerStack: positiveInteger(options, 'maxMapsPerStack'),
   }
 }
 
@@ -89,7 +91,7 @@ function lineOf(content, line) {
     start = newline + 1
   }
   const end = content.indexOf('\n', start)
-  return content.slice(start, Math.min(end === -1 ? content.length : end, start + MAX_SOURCE_LINE)).trim()
+  return sanitize(content.slice(start, Math.min(end === -1 ? content.length : end, start + MAX_SOURCE_LINE))).trim()
 }
 
 function unmappedFrame(raw) {
@@ -113,19 +115,19 @@ function createResolver(options) {
   const config = normalizeOptions(options)
   const store = createMapStore(config)
 
-  function mapFrame(raw, map) {
+  function mapKnownFrame(raw, map) {
     if (!map || raw.line === null || raw.line < 1 || raw.column === null || raw.column < 1) {
       return { frame: unmappedFrame(raw), callee: null }
     }
     // stack columns count from 1, source map columns from 0
     const position = originalPositionFor(map, { line: raw.line, column: raw.column - 1 })
-    // a hostile map can point a mapping at a `sources` entry that does not exist
+    // a hostile map can point a mapping at a `sources` entry that does not exist, or hold numbers that are not numbers
     const source = typeof position.source === 'string' ? normalizeSource(position.source, config.root) : null
-    if (source === null) {
+    if (source === null || !Number.isSafeInteger(position.line) || !Number.isSafeInteger(position.column)) {
       return { frame: unmappedFrame(raw), callee: null }
     }
     const frame = {
-      source,
+      source: sanitize(source),
       line: position.line,
       column: position.column + 1,
       name: cleanName(raw.name),
@@ -137,7 +139,17 @@ function createResolver(options) {
       // sourcesContent may be shorter than sources, or hold anything
       frame.sourceLine = typeof content === 'string' ? lineOf(content, position.line) : null
     }
-    return { frame, callee: position.name }
+    const callee = typeof position.name === 'string' ? sanitize(position.name.slice(0, MAX_NAME_LENGTH)) : null
+    return { frame, callee }
+  }
+
+  // Maps are data from outside this process; whatever is wrong inside one costs its frames their mapping, not the request.
+  function mapFrame(raw, map) {
+    try {
+      return mapKnownFrame(raw, map)
+    } catch {
+      return { frame: unmappedFrame(raw), callee: null }
+    }
   }
 
   /**
@@ -152,8 +164,8 @@ function createResolver(options) {
     }
     const files = raw.map((frame) => bundleFileName(frame.file))
     const maps = new Map()
-    // one stack may name any number of bundles, but only as many maps as the cache holds are opened for it
-    const names = [...new Set(files)].filter(Boolean).slice(0, config.maxCachedMaps)
+    // one stack may name any number of bundles, but at most maxMapsPerStack maps are opened for it
+    const names = [...new Set(files)].filter(Boolean).slice(0, config.maxMapsPerStack)
     await Promise.all(names.map(async (name) => maps.set(name, await store.get(name))))
     const mapped = raw.map((frame, i) => mapFrame(frame, maps.get(files[i])))
     const frames = mapped.map(({ frame }) => frame)

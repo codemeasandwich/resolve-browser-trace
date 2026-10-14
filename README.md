@@ -61,13 +61,14 @@ call 0.x versions used (`setup` is kept as another name for `createResolver`).
 |---|---|---|
 | `mapsDir` | | A folder with `<bundle file name>.map` files, for example `app-1a2b3c.js.map`. A map is read the first time its bundle shows up, so maps copied there after the server started are found. Once loaded it stays cached until evicted: use new file names (content hashes do) to replace a map. |
 | `maps` | | Maps in memory, keyed by bundle file name: `{ 'app-1a2b3c.js': jsonTextBufferOrObject }`. Parsed when first needed, then cached. |
-| `loadMap` | | `(fileName) => map \| null \| Promise<map \| null>`. Called with the bundle file name; return its map or `null`. The name comes from the client, so treat it as untrusted. Misses are not cached and there is no timeout, and one stack can call it up to `maxCachedMaps` times: cache misses and bound the time yourself if it reaches a database or the network. |
+| `loadMap` | | `(fileName) => map \| null \| Promise<map \| null>`. Called with the bundle file name; return its map or `null`. The name comes from the client, so treat it as untrusted. Misses are not cached and there is no timeout, and one stack can call it up to `maxMapsPerStack` times: cache misses and bound the time yourself if it reaches a database or the network. |
 | `root` | | The folder your bundler ran in, for example `/srv/build/shop`. Source paths under it come back relative to it. |
 | `includeSource` | `false` | Add `sourceLine`, the original line of code from the map's `sourcesContent`. Off by default because it puts source code in your logs. |
 | `onError` | | `(error, { file })`, called when a map exists but cannot be loaded or parsed. A map that does not exist is not an error. |
 | `maxStackLength` | `65536` | Characters of stack text read; the rest is ignored. |
 | `maxFrames` | `100` | Frames returned for one stack. |
-| `maxCachedMaps` | `16` | Parsed maps kept in memory, least recently used out first. Also the most maps one stack can open. |
+| `maxCachedMaps` | `16` | Parsed maps kept in memory, least recently used out first. |
+| `maxMapsPerStack` | `4` | Most maps opened for one stack; frames of further bundles stay unmapped. Parsing a map is synchronous work, so this bounds what one request can cost. |
 
 At least one of `mapsDir`, `maps` and `loadMap` is required (otherwise `createResolver` throws a `TypeError`).
 They are tried in the order `maps`, `loadMap`, `mapsDir`.
@@ -138,13 +139,14 @@ Nothing returned starts with `/`, `..` or a drive letter. Set `root`, and paths 
 The stack and every name in it come from a browser you do not control.
 
 * Only the first `maxStackLength` characters are read, at most `maxFrames` frames are returned, and a line over 2000
-  characters is ignored. One stack opens at most `maxCachedMaps` maps (frames of further bundles stay unmapped), so
-  a page that names many chunks cannot make the server hold many maps at once.
-* Control characters are removed from stack text, so a frame cannot forge another one in your log. Unmapped frames
+  characters is ignored. One stack opens at most `maxMapsPerStack` maps (frames of further bundles stay unmapped), so
+  a page that names many chunks cannot make the server parse and hold many maps for one request. Misses and
+  broken maps are not cached, so keep `mapsDir` and `loadMap` cheap.
+* Control and direction-changing characters are removed from stack text and from map-supplied names, paths and source lines, so a frame cannot forge another one in your log. Unmapped frames
   still echo client text (function names, URLs): treat them as untrusted in logs.
 * Only real maps are cached, in an LRU of `maxCachedMaps`. Names a page invents are never stored.
 * A bundle name cannot contain a path separator, so `mapsDir` cannot be escaped.
-* No input makes `resolve` throw or reject, including broken maps and a throwing `loadMap` or `onError`.
+* No input makes `resolve` throw or reject, including broken or hostile maps, and a throwing or rejecting `loadMap` or `onError`.
 
 ## Example: production error forensics with Bun and React 19
 

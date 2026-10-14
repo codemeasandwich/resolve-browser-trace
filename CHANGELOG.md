@@ -16,7 +16,7 @@ or fixed, and the second list is what can change your results.
 
 - `createResolver(options)` (also exported as `setup`) with `mapsDir`, `maps` (maps in memory, as JSON text, a Buffer
   or an object, so a `bun build --compile` binary can embed them), `loadMap(fileName)`, `root`, `includeSource`,
-  `onError`, `maxStackLength`, `maxFrames` and `maxCachedMaps`. `createResolver('<folder>')` still works.
+  `onError`, `maxStackLength`, `maxFrames`, `maxCachedMaps` and `maxMapsPerStack`. `createResolver('<folder>')` still works.
 - `mapped` on every frame; `frames.stack`, a readable rebuilt stack (not enumerable, so not in the JSON);
   `formatStack(frames)`; optional `sourceLine` (the original line of code from `sourcesContent`).
 - Stack parsers for Chrome / Edge / Node / Bun (V8), Firefox (SpiderMonkey) and Safari (JavaScriptCore), including
@@ -39,8 +39,8 @@ or fixed, and the second list is what can change your results.
 - Every new bundle name listed the whole maps folder with `fs.readdir`. The exact `<name>.map` is read instead.
 - The cache was keyed by client-controlled text and grew without limit; consumers were never destroyed, leaking
   WebAssembly memory. The cache is now an LRU of parsed maps, only real maps are cached, and input is capped
-  (65536 characters, 100 frames, 2000 characters per line). One stack opens at most `maxCachedMaps` maps. Control
-  characters are removed from stack text, and line or column numbers that are not safe integers are ignored.
+  (65536 characters, 100 frames, 2000 characters per line). One stack opens at most `maxMapsPerStack` (4) maps. Control
+  and direction-changing characters are removed from stack text and map-supplied text, and line or column numbers that are not safe integers are ignored.
 - Stack columns count from 1 and source map columns from 0, but the stack column was used as it was, so lookups
   were one column off. The "Chrome parse fix" workaround is gone because the parser reads the line and column itself.
 - Content-hashed names from Bun (`[name]-[hash].js`, `chunk-<hash>.js`), webpack, Vite and esbuild, and URLs with

@@ -30,8 +30,19 @@ function makeExecutable(from, to) {
   }
 }
 
+function sharedHooksPath() {
+  try {
+    return execFileSync('git', ['config', '--get', 'core.hooksPath'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() !== ''
+  } catch {
+    return false
+  }
+}
+
 const target = hooksTarget()
-if (target && fs.existsSync(source)) {
+if (target && sharedHooksPath()) {
+  // core.hooksPath often points at a folder shared by many repositories: never overwrite hooks there
+  console.log('resolve-browser-trace: core.hooksPath is set, git hooks not installed (copy .hooks/* yourself if wanted)')
+} else if (target && fs.existsSync(source)) {
   fs.mkdirSync(target, { recursive: true })
   fs.cpSync(source, target, { recursive: true })
   makeExecutable(source, target)

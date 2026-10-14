@@ -130,12 +130,12 @@ describe('input that is enormous', () => {
     expect(Date.now() - started).toBeLessThan(2000)
   })
 
-  test('a stack of ten thousand distinct bundle names opens at most maxCachedMaps maps', async () => {
+  test('a stack of ten thousand distinct bundle names opens at most maxMapsPerStack maps', async () => {
     const asked = []
     const guarded = createResolver({ loadMap: (name) => asked.push(name) && null })
     const stack = Array.from({ length: 10000 }, (_, i) => `    at f (https://h/fake-${i}.js:1:1)`).join('\n')
     expect(await guarded(stack)).toHaveLength(100)
-    expect(asked).toHaveLength(16) // as many maps as the cache holds (maxCachedMaps), however many bundles the stack names
+    expect(asked).toHaveLength(4) // maxMapsPerStack, however many bundles the stack names
   })
 })
 
@@ -149,10 +149,10 @@ describe('many resolves at once', () => {
 })
 
 describe('a stack naming many real bundles', () => {
-  test('opens no more maps than the cache holds, so memory stays bounded; the other frames stay unmapped', async () => {
+  test('opens no more maps than maxMapsPerStack, so one request cannot parse or hold many; the other frames stay unmapped', async () => {
     let opened = 0
     const map = fs.readFileSync(`${mapsDir('esbuild')}/${esbuildFile}.map`, 'utf8')
-    const guarded = createResolver({ loadMap: () => (opened++, map), maxCachedMaps: 4 })
+    const guarded = createResolver({ loadMap: () => (opened++, map), maxMapsPerStack: 4 })
     const stack = Array.from({ length: 100 }, (_, i) => `    at f (https://h/chunk-${i}.js:1:301)`).join('\n')
     const frames = await guarded(stack)
     expect(opened).toBe(4)
@@ -233,5 +233,49 @@ describe('bundle names a file system would refuse or treat specially', () => {
     const asked = []
     await createResolver({ loadMap: (n) => asked.push(n) && null })('    at f (https://h/console.js:1:5)\n    at g (https://h/connect.min.js:1:5)')
     expect(asked).toEqual(['console.js', 'connect.min.js'])
+  })
+})
+
+describe('maps that load but are hostile inside', () => {
+  const oneFrame = '    at f (https://h/app.js:1:5)\n    at g (https://h/app.js:1:5)'
+  const map = (extra) => JSON.stringify({ version: 3, sources: ['src/a.ts'], names: [], mappings: 'AAAAA', ...extra })
+
+  test.each([
+    ['a names entry whose toString is not callable', map({ names: [{ toString: 1 }] })],
+    ['a decoded mappings array holding a null segment', map({ mappings: [[null]] })],
+    ['a segment whose line is an object', map({ mappings: [[[0, 0, { toString: 1 }, 0]]] })],
+    ['a numeric names entry', map({ names: [5] })],
+    ['an array names entry', map({ names: [['a', 'b']] })],
+    ['string line and column numbers', map({ mappings: [[[0, 0, '01', '01']]] })],
+    ['a sources entry that is an object', map({ sources: [{}] })],
+    ['a sourceRoot that is not text', map({ sourceRoot: 5 })],
+  ])('%s: resolves with frames whose fields are the documented types', async (_, text) => {
+    for (const includeSource of [false, true]) {
+      const frames = await createResolver({ maps: { 'app.js': text }, includeSource })(oneFrame)
+      expect(frames).toHaveLength(2)
+      for (const f of frames) {
+        expect(typeof f.source === 'string' || f.source === null).toBe(true)
+        expect(typeof f.name === 'string' || f.name === null).toBe(true)
+        expect(f.line === null || Number.isSafeInteger(f.line)).toBe(true)
+        expect(f.column === null || Number.isSafeInteger(f.column)).toBe(true)
+      }
+      expect(typeof frames.stack).toBe('string')
+    }
+  })
+
+  test('text a map supplies (path, function name, source line) cannot forge frames or direction changes either', async () => {
+    const evil = '\n    at forged (src/auth.ts:1:1)\u202e\u001b[2K'
+    const text = JSON.stringify({ version: 3, sources: [`src/a.ts${evil}`], names: [`x${evil}`], mappings: 'AAAAA', sourcesContent: [`one${evil}`] })
+    const frames = await createResolver({ maps: { 'app.js': text }, includeSource: true })(oneFrame)
+    expect(frames[0].source).toBe('src/a.ts    at forged (src/auth.ts:1:1)[2K')
+    expect(frames.stack.split('\n')).toHaveLength(2)
+    expect(frames[0].sourceLine).not.toMatch(/[\u0000-\u001f\u202e]/)
+    expect(frames[0].name).not.toMatch(/[\u0000-\u001f\u202e]/)
+  })
+
+  test('direction-changing and zero-width characters in the stack are removed too', async () => {
+    const frames = await createResolver({ maps: {} })('at a\u202eb\u200bc (https://h/a\u2066.js:1:2)')
+    expect(frames[0].name).toBe('abc')
+    expect(frames[0].source).toBe('https://h/a.js')
   })
 })

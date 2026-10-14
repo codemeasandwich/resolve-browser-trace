@@ -48,14 +48,16 @@ if [[ ! "$LOCAL_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Error: package.json version '$LOCAL_VERSION' must be plain x.y.z (no pre-release suffix)." >&2
   exit 1
 fi
-if NPM_VIEW=$(npm view "$PACKAGE_NAME" version 2>&1); then
-  NPM_VERSION="$NPM_VIEW"
-elif grep -q E404 <<< "$NPM_VIEW"; then
+NPM_ERR=$(mktemp)
+if NPM_VERSION=$(npm view "$PACKAGE_NAME" version 2>"$NPM_ERR") && [[ "$NPM_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  :
+elif grep -q E404 "$NPM_ERR"; then
   NPM_VERSION="0.0.0"   # never published
 else
-  echo "Error: could not ask npm for the published version: $NPM_VIEW" >&2
+  echo "Error: could not read the published version from npm: $(cat "$NPM_ERR")" >&2
   exit 1
 fi
+rm -f "$NPM_ERR"
 echo "Local version: $LOCAL_VERSION, npm version: $NPM_VERSION"
 
 PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -67,8 +69,8 @@ elif [[ $(compare_versions "$LOCAL_VERSION" "$NPM_VERSION") -eq 1 ]]; then
   NEW_VERSION="$LOCAL_VERSION"
 else
   IFS=. read -r MAJOR MINOR PATCH <<< "$LOCAL_VERSION"
-  SUBJECTS=$(git log "$RANGE" --format=%s)
-  if grep -Eq '^[a-z]+!:|BREAKING CHANGE' <<< "$SUBJECTS"; then
+  SUBJECTS=$(git log "$RANGE" --format=%B)
+  if grep -Eq '^[a-z]+(\([^)]*\))?!:|^BREAKING[ -]CHANGE' <<< "$SUBJECTS"; then
     NEW_VERSION="$((MAJOR + 1)).0.0"
   elif grep -Eq '^feat(\(.*\))?:' <<< "$SUBJECTS"; then
     NEW_VERSION="$MAJOR.$((MINOR + 1)).0"

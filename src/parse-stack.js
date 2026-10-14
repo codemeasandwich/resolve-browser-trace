@@ -11,11 +11,9 @@
 // Everything that is not a frame (the "TypeError: message" header, blank lines, junk) is skipped. Nothing here throws.
 // The caller bounds the input; MAX_LINE_LENGTH additionally keeps every regular expression below linear-ish.
 
-const MAX_LINE_LENGTH = 2000
-// Control characters (including \r, ANSI escapes, line and paragraph separators) never belong in a frame, and in a log
-// line they could fake another frame or rewrite the terminal.
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g
+const { sanitize } = require('./sanitize')
 
+const MAX_LINE_LENGTH = 2000
 // "eval at <fn> (<url>:<line>:<col>), <anonymous>:1:5" -> the place that called eval is the part a source map knows.
 const EVAL_ORIGIN = /^eval at [^(]*\((.*?):(\d+):(\d+)\)(?:, .*)?$/
 const WITH_COLUMN = /^(.*):(\d+):(\d+)$/
@@ -83,7 +81,7 @@ function parseStack(text, limits) {
   const frames = []
   const lines = text.split('\n')
   for (let i = 0; i < lines.length && frames.length < limits.maxFrames; i++) {
-    const line = lines[i].replace(CONTROL_CHARACTERS, '').trim()
+    const line = sanitize(lines[i]).trim()
     if (line.length === 0 || line.length > MAX_LINE_LENGTH) {
       continue
     }

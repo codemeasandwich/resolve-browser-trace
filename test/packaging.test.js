@@ -102,6 +102,20 @@ describe('the git hooks', () => {
     expect(execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: bare, encoding: 'utf8' })).toBe('')
   })
 
+  test('when core.hooksPath is set (hooks shared by many repositories) nothing is written there', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-shared-'))
+    const shared = fs.mkdtempSync(path.join(os.tmpdir(), 'rbt-shared-hooks-'))
+    fs.writeFileSync(path.join(shared, 'pre-commit'), '#!/bin/sh\necho theirs\n')
+    execFileSync('git', ['init', '-q'], { cwd: repo })
+    execFileSync('git', ['config', 'core.hooksPath', shared], { cwd: repo })
+    fs.cpSync(path.join(PROJECT_ROOT, '.hooks'), path.join(repo, '.hooks'), { recursive: true })
+    fs.mkdirSync(path.join(repo, 'scripts'))
+    fs.copyFileSync(path.join(PROJECT_ROOT, 'scripts', 'install-hooks.js'), path.join(repo, 'scripts', 'install-hooks.js'))
+    expect(execFileSync(process.execPath, ['scripts/install-hooks.js'], { cwd: repo, encoding: 'utf8' })).toMatch(/core\.hooksPath is set/)
+    expect(fs.readdirSync(shared)).toEqual(['pre-commit'])
+    expect(fs.readFileSync(path.join(shared, 'pre-commit'), 'utf8')).toContain('theirs')
+  })
+
   test('the commit-msg hook accepts "<type>: <summary>" and refuses other subjects', () => {
     const hook = path.join(PROJECT_ROOT, '.hooks', 'commit-msg')
     const check = (subject) => {

@@ -238,11 +238,14 @@ describe('how long maps are kept', () => {
     expect(loads.filter((name) => name === 'fake-0.js')).toHaveLength(2) // a fake is asked for again: it was not cached
   })
 
-  test('one stack cannot ask for more bundle maps than it has frames', async () => {
-    const { resolve, loads } = counting({ maxFrames: 5 })
+  test('one stack opens at most maxMapsPerStack maps (4 unless set), however many bundles and frames it has', async () => {
+    const { resolve, loads } = counting()
     const stack = Array.from({ length: 500 }, (_, i) => stackFor(`fake-${i}.js`)).join('\n')
     await resolve(stack)
-    expect(loads).toHaveLength(5)
+    expect(loads).toHaveLength(4)
+    const wider = counting({ maxMapsPerStack: 7 })
+    await wider.resolve(stack)
+    expect(wider.loads).toHaveLength(7)
   })
 })
 

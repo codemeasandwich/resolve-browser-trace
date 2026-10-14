@@ -23,9 +23,9 @@ declare namespace createResolver {
     /** Maps in memory, keyed by bundle file name: `{ 'app-1a2b3c.js': mapJsonOrObject }`. Parsed when first needed, then cached. */
     maps?: Record<string, SourceMapInput>
     /**
-     * Called with a bundle file name that looks like a plain file name; return its map, or null/undefined when you
+     * Called with a bundle file name that looks like a plain script file name; return its map, or null/undefined when you
      * have none. The name comes from the client: treat it as untrusted. Consulted after `maps`, before `mapsDir`.
-     * Misses are not cached and there is no timeout: one stack can call this up to `maxCachedMaps` times, so cache
+     * Misses are not cached and there is no timeout: one stack can call this up to `maxMapsPerStack` times, so cache
      * misses and bound the time yourself if it talks to a database or the network.
      */
     loadMap?: (fileName: string) => SourceMapInput | null | undefined | Promise<SourceMapInput | null | undefined>
@@ -42,8 +42,10 @@ declare namespace createResolver {
     maxStackLength?: number
     /** Most frames returned for one stack. Default 100. */
     maxFrames?: number
-    /** Parsed maps kept in memory (least recently used leave first), and the most maps one stack can open. Default 16. */
+    /** Parsed maps kept in memory (least recently used leave first). Default 16. */
     maxCachedMaps?: number
+    /** Most maps opened for one stack; frames of further bundles stay unmapped. Default 4. */
+    maxMapsPerStack?: number
   }
 
   interface Frame {
